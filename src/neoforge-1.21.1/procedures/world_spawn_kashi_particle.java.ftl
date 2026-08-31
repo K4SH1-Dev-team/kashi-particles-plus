@@ -1,9 +1,12 @@
 <#--
-	Fires a KASHI effect at a world position, unaimed.
+	Fires a KASHI effect at a world position, aimed by an explicit direction vector.
 
-	The zero direction means world space: the effect keeps the orientation it was authored with in
-	Snowstorm, with up still up. That is what AOE-style effects need - aiming them would tip the
-	whole effect over.
+	A zero direction (the default) means world space: the effect keeps the orientation it was
+	authored with in Snowstorm, with up still up. That is what AOE-style effects need. A non-zero
+	direction turns the whole effect to face that way - there is no entity here to read a look
+	direction off, so unlike the entity-spawn block this takes the vector directly rather than an
+	aim mode; see KashiParticleAPI.spawnKashiParticle for how it is consumed (same aimQuaternion
+	machinery as the entity block's "aim").
 
 	Fully-qualified names throughout, because a procedure's generated file has no imports of ours.
 
@@ -16,4 +19,4 @@ if (world instanceof net.minecraft.world.level.Level _kashiLevel${cbi})
 		net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
 			net.kashi.particles.runtime.KashiParticlesRuntime.MODID,
 			"${field$effect?replace("CUSTOM:", "")?replace("(.)([A-Z][a-z]+)", "$1_$2", "r")?replace("([a-z0-9])([A-Z])", "$1_$2", "r")?lower_case}"),
-		${input$x}, ${input$y}, ${input$z}, 0, 0, 0);
+		${input$x}, ${input$y}, ${input$z}, ${input$dirx}, ${input$diry}, ${input$dirz});

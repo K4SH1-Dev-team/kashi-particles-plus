@@ -1,5 +1,5 @@
 <#--
-	Fires a KASHI effect from an entity, offset from its eyes and turned by the chosen aim mode.
+	Fires a KASHI effect from an entity, offset from its feet and turned by the chosen aim mode.
 
 	The offset and the aim maths live in KashiParticleAPI rather than here, so the behaviour is one
 	readable Java method instead of branching freemarker - and so the same rules apply wherever the
