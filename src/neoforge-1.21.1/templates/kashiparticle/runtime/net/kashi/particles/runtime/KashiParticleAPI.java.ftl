@@ -54,7 +54,7 @@ public final class KashiParticleAPI {
 	public static final String AIM_FULL = "FULL";
 
 	/**
-	 * Fires an effect from an entity, offset from its eyes and turned according to an aim mode.
+	 * Fires an effect from an entity, offset from its feet and turned according to an aim mode.
 	 *
 	 * <p>Aim and the effect's own {@code facing_camera_mode} are different things and both matter.
 	 * Facing decides how each particle is oriented (set in Snowstorm, per effect); aim decides how
@@ -70,6 +70,10 @@ public final class KashiParticleAPI {
 	 *
 	 * <p>The offset is measured in the entity's own frame - {@code forward} is where it is facing
 	 * horizontally, so "3 blocks in front" stays 3 blocks in front whether it looks up or down.
+	 * {@code up} is measured from the entity's feet (its base position, not its eyes), so
+	 * {@code up: 0} lands the effect on the ground under the entity - the common case for auras
+	 * and area effects - rather than requiring a negative offset to compensate for eye height.
+	 * Aim direction still comes from {@link Entity#getLookAngle()}, independent of this anchor.
 	 */
 	public static void spawnFromEntity(Level level, ResourceLocation effectId, Entity entity,
 			double right, double up, double forward, String aimMode) {
@@ -81,7 +85,7 @@ public final class KashiParticleAPI {
 		Vec3 facing = flat.lengthSqr() < 1.0e-6 ? new Vec3(0, 0, -1) : flat.normalize();
 		Vec3 side = new Vec3(-facing.z, 0, facing.x);
 
-		Vec3 origin = entity.getEyePosition()
+		Vec3 origin = entity.position()
 				.add(side.scale(right))
 				.add(0, up, 0)
 				.add(facing.scale(forward));

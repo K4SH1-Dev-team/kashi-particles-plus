@@ -24,23 +24,28 @@
 The element only stores the JSON and the texture — nothing is rewritten. What plays in-game is
 byte-for-byte what you imported.
 
+The wizard won't let you save without both a successfully-imported `.particle.json` and a
+texture — an incomplete KASHI Particle element can't make it into the workspace.
+
 ## Firing an effect
 
 Three procedure blocks, all under the **KASHI Particles** category:
 
 ### Spawn KASHI Particle at x / y / z
 
-Fires the effect at a world position, in the orientation it was authored with (world axes; "up"
-stays up). Use this for anything that isn't tied to a specific entity — an AOE, a structure
-effect, a fixed hazard.
+Fires the effect at a world position. `direction x/y/z` defaults to `(0, 0, 0)`, which keeps the
+orientation it was authored with (world axes; "up" stays up) — best for an AOE, a structure
+effect, a fixed hazard. A non-zero direction turns the whole effect to face that way, the same
+idea as **aim** on the entity block below, just given directly since there's no entity to read a
+look direction from.
 
 ### Spawn KASHI Particle from entity
 
-Fires from the entity's eye position, offset in the entity's **own** frame:
+Fires from the entity's **feet**, offset in the entity's **own** frame:
 
 - `right` / `up` / `forward` — the offset, in blocks, measured relative to the entity (so
   `forward: 3` always means "3 blocks in front of wherever it's looking", not a fixed world
-  direction).
+  direction; `up: 0` lands on the ground, not at eye height).
 - `aim` — how much of the entity's orientation the effect inherits:
   - **follows full look (up/down too)** — pitch included; an effect fired while looking up travels
     up. What most hit/cast effects want.
@@ -58,7 +63,8 @@ snapping to a stop the instant it's created).
 
 ### Spawn KASHI Particle from block
 
-Fires at the centre of a block, in its authored world orientation.
+Fires at the centre of a block. Same `direction x/y/z` as the world-position block above — zero
+keeps the authored world orientation, non-zero turns the effect to face that way.
 
 ## Performance: firing many effects at once
 

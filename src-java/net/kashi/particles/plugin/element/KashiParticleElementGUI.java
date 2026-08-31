@@ -11,6 +11,7 @@ import net.mcreator.ui.MCreator;
 import net.mcreator.ui.dialogs.TypedTextureSelectorDialog;
 import net.mcreator.ui.minecraft.TextureSelectionButton;
 import net.mcreator.ui.modgui.ModElementGUI;
+import net.mcreator.ui.validation.AggregatedValidationResult;
 import net.mcreator.ui.workspace.resources.TextureType;
 import net.mcreator.workspace.elements.ModElement;
 
@@ -225,9 +226,30 @@ public class KashiParticleElementGUI extends ModElementGUI<KashiParticleElement>
 		return element;
 	}
 
-	// TODO(next): block saving when particleJson or texture is missing. MCreator's validation
-	// API (AggregatedValidationResult + ValidationGroup/Validator) needs wiring; for now the
-	// import step only stores JSON that already parsed, and the texture button requires a value.
+	/**
+	 * Blocks saving an element that never got a successfully-imported {@code .particle.json}.
+	 *
+	 * <p>The texture is already covered - {@code textureButton.requireValue(...)} in
+	 * {@link #initGUI()} blocks saving on its own. This is the other half: nothing about the
+	 * on-screen state (a label's text) otherwise stops MCreator from happily saving an element
+	 * whose {@link KashiParticleElement#particleJson} is null, which would only surface later as
+	 * a broken effect in the generated mod. Called from MCreator's own save/finish flow - see
+	 * {@code ModElementGUI.finishModCreation()} - so returning FAIL here genuinely blocks the
+	 * click, it does not just log a warning.
+	 */
+	@Override
+	protected AggregatedValidationResult getAdditionalValidationResult(KashiParticleElement element) {
+		AggregatedValidationResult result = super.getAdditionalValidationResult(element);
+
+		if (!result.validateIsErrorFree())
+			return result;
+
+		if (this.particleJson == null)
+			return new AggregatedValidationResult.FAIL(
+					"A KASHI Particle needs an imported .particle.json before it can be saved.");
+
+		return new AggregatedValidationResult.PASS();
+	}
 
 	@Override
 	public URI contextURL() throws URISyntaxException {
