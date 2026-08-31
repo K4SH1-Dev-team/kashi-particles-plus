@@ -7,7 +7,10 @@
 $ErrorActionPreference = "Stop"
 
 $project = Split-Path -Parent $PSScriptRoot
-$wsRoot  = Join-Path $project "workspace\kashi_particle_test\src\main\java\net\kashi\particles"
+# The repo (this script's parent tree) and the local-only dev environment (test workspaces) are
+# sibling folders under the project root - see docs/DEVELOPMENT.md.
+$localRoot = Join-Path (Split-Path -Parent $project) "local"
+$wsRoot    = Join-Path $localRoot "workspace\kashi_particle_test\src\main\java\net\kashi\particles"
 
 # core (parser + MoLang) and runtime (particle engine) both live in the project; the workspace gets
 # a copy purely so the fast javac check and in-game testing have something to compile.

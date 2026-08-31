@@ -23,7 +23,10 @@ import os
 import re
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WORKSPACE = os.path.join(PROJECT, "workspace", "kashi_particle_test")
+# The repo (this script's parent tree) and the local-only dev environment (test workspaces) are
+# sibling folders under the project root - see docs/DEVELOPMENT.md.
+LOCAL_ROOT = os.path.join(os.path.dirname(PROJECT), "local")
+WORKSPACE = os.path.join(LOCAL_ROOT, "workspace", "kashi_particle_test")
 MODID = "kashi_particle_test"
 
 ELEMENTS = os.path.join(WORKSPACE, "elements")

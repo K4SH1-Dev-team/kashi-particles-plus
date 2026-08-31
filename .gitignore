@@ -1,27 +1,7 @@
-# This folder is a full MCreator development environment, not just the plugin - most of what
-# lives here on disk is deliberately NOT tracked. See docs/DEVELOPMENT.md for what each ignored
-# folder is and why.
-
-# The MCreator installation itself (the .exe, bundled JDK, etc.) - not our code, hundreds of MB.
-/mcreator/
-
-# Dev/test MCreator workspaces: generated Java, Gradle caches, build output, Minecraft saves and
-# logs. All reproducible from the plugin + a fresh workspace; none of it belongs in version
-# control.
-/workspace/
-
-# Third-party Bedrock resource packs used only as import-fidelity test fixtures (Demon Slayer,
-# One Piece "One Fruit", etc.). Not our IP - never redistribute these.
-/ds rp/
-/textures/
-/dsl_ver2_0-35374439/
-
-# Claude Code session artifacts - not project content.
-/_session_transfer/
-.claude/settings.local.json
-
-# Orphaned local test asset, not part of the plugin or any tracked resource pack.
-/slash.png
+# This repo is one of two sibling folders under the project root - the other is `local/`
+# (the MCreator install, dev/test workspaces, third-party test resource packs, session
+# artifacts - see docs/DEVELOPMENT.md). Nothing under `local/` is a descendant of this repo, so
+# there is nothing to exclude for it here; this file only needs the generic entries below.
 
 # Python cache from tools/*.py
 __pycache__/

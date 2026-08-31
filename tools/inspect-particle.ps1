@@ -12,8 +12,11 @@ param([Parameter(Mandatory = $true)][string]$File)
 $ErrorActionPreference = "Stop"
 
 $project  = Split-Path -Parent $PSScriptRoot
-$mcreator = Join-Path $project "mcreator"
-$out      = Join-Path $env:TEMP "kashi-inspect"
+# The repo (this script's parent tree) and the local-only dev environment (MCreator install) are
+# sibling folders under the project root - see docs/DEVELOPMENT.md.
+$localRoot = Join-Path (Split-Path -Parent $project) "local"
+$mcreator  = Join-Path $localRoot "mcreator"
+$out       = Join-Path $env:TEMP "kashi-inspect"
 
 $javac = Join-Path $mcreator "jdk\bin\javac.exe"
 $java  = Join-Path $mcreator "jdk\bin\java.exe"

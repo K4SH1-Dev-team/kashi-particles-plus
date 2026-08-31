@@ -14,7 +14,10 @@
 $ErrorActionPreference = "Stop"
 
 $project  = Split-Path -Parent $PSScriptRoot
-$mcreator = Join-Path $project "mcreator"
+# The repo (this script's parent tree) and the local-only dev environment (MCreator install,
+# test workspaces) are sibling folders under the project root - see docs/DEVELOPMENT.md.
+$localRoot = Join-Path (Split-Path -Parent $project) "local"
+$mcreator  = Join-Path $localRoot "mcreator"
 $work     = Join-Path $env:TEMP "kashi-plugin-build"
 $apiJar   = Join-Path $work "mcreator-api.jar"
 $classes  = Join-Path $work "classes"

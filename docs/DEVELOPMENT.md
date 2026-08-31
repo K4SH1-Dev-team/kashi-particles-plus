@@ -36,14 +36,33 @@ tools/      Every dev script below.
 
 ## Prerequisites
 
-- A local MCreator install (this repo assumes `mcreator/mcreator.exe` next to this README — see
-  `.gitignore`; that folder is intentionally not tracked, bring your own).
-- A dev/test MCreator workspace using the NeoForge 1.21.1 generator, opened and built at least
-  once in MCreator itself so its Gradle moddev "merged" jar and module cache exist on disk (see
-  `.gitignore` for `/workspace/` — also not tracked; the scripts below default to paths under it
-  and expect you to have one).
+This repo (`github/`) is one of two sibling folders under a project root — the other,
+conventionally named `local/`, holds everything the scripts below need that isn't tracked in
+version control:
+
+```
+<project root>/
+├── github/     <- this repo
+└── local/
+    ├── mcreator/     <- your MCreator install
+    └── workspace/
+        └── kashi_particle_test/   <- your dev/test workspace
+```
+
+- **`local/mcreator/`** — a local MCreator install (`mcreator.exe` directly inside it). Bring
+  your own; every script that needs it (`tools/build-plugin.ps1`,
+  `tools/check-mod-compile.ps1`, `tools/inspect-particle.ps1`,
+  `tools/validate-particles.ps1`) resolves it as `../local/mcreator` relative to this repo.
+- **`local/workspace/kashi_particle_test/`** — a dev/test MCreator workspace using the
+  NeoForge 1.21.1 generator, with that exact folder name (`tools/check-mod-compile.ps1` and
+  `tools/sync-core-to-workspace.ps1` hardcode it). Open and build it in MCreator at least once
+  first, so its Gradle moddev "merged" jar and module cache exist on disk.
 - PowerShell and Python 3 with `numpy` (only needed for `optimize-textures.py`, which is offline
   tooling, not part of the shipped runtime).
+
+None of this is a hard requirement of the *layout* — every script computes these paths from its
+own location, so a different project-root/sibling-folder arrangement works too as long as you
+update the `$localRoot`/`LOCAL_ROOT` line near the top of each script accordingly.
 
 ## Build pipeline
 

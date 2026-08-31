@@ -36,9 +36,12 @@ import sys
 import zlib
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PACK = os.path.join(PROJECT, "ds rp")
+# The repo (this script's parent tree) and the local-only dev environment (test packs, test
+# workspaces) are sibling folders under the project root - see docs/DEVELOPMENT.md.
+LOCAL_ROOT = os.path.join(os.path.dirname(PROJECT), "local")
+PACK = os.path.join(LOCAL_ROOT, "ds rp")
 PARTICLES = os.path.join(PACK, "particles")
-WORKSPACE = os.path.join(PROJECT, "workspace", "kashi_particle_test")
+WORKSPACE = os.path.join(LOCAL_ROOT, "workspace", "kashi_particle_test")
 MODID = "kashi_particle_test"
 
 ELEMENTS = os.path.join(WORKSPACE, "elements")

@@ -74,18 +74,20 @@ engine.
 See [docs/USAGE.md](docs/USAGE.md) for the full block reference, aim-mode semantics, and
 performance guidance for firing many effects at once.
 
-## Building from source
+## Documentation
 
-This is not the standard MCreator Gradle plugin workflow — see
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for why and for the full build pipeline
-(`tools/*.ps1`/`*.py`), the codebase layout (`core/` vs `runtime/` vs `src/` vs `src-java/`), and
-how to point it at your own MCreator installation and dev workspace.
-
-## Roadmap
-
-- Port to MCreator 2026.2 with the NeoForge 1.21.8, 26.1 and 26.2 generators.
-- See [PLANO-PARIDADE-SNOWSTORM.md](PLANO-PARIDADE-SNOWSTORM.md) for the (historical) Bedrock
-  parity plan this plugin was built against.
+- [docs/USAGE.md](docs/USAGE.md) — importing effects, the procedure blocks, aim modes, the debug
+  command, and performance guidance for firing many effects at once.
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — building from source. This is **not** the standard
+  MCreator Gradle plugin workflow — see why, plus the full build pipeline (`tools/*.ps1`/`*.py`),
+  prerequisites, and how the local dev environment is laid out.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how it works internally: the MoLang engine, the
+  particle lifecycle, the code-generation pipeline, and the non-obvious decisions worth
+  understanding before changing anything.
+- [docs/ROADMAP.md](docs/ROADMAP.md) — what's done (including the historical Bedrock parity plan
+  this plugin was built against) and what's next.
+- [CLAUDE.md](CLAUDE.md) — a short orientation file for an AI assistant (or new contributor)
+  opening this repository, pointing into the docs above.
 
 ## License
 

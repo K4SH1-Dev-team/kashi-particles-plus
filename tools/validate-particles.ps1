@@ -3,15 +3,18 @@
 # Use before importing a pack: it lists the effects that would not load at all (and why), and the
 # components that load but silently lose behaviour.
 #
-#   tools\validate-particles.ps1 "G:\...\ds rp\particles"
+#   tools\validate-particles.ps1 "G:\...\local\ds rp\particles"
 
 param([Parameter(Mandatory = $true)][string]$Folder)
 
 $ErrorActionPreference = "Stop"
 
 $project  = Split-Path -Parent $PSScriptRoot
-$mcreator = Join-Path $project "mcreator"
-$out      = Join-Path $env:TEMP "kashi-validate"
+# The repo (this script's parent tree) and the local-only dev environment (MCreator install) are
+# sibling folders under the project root - see docs/DEVELOPMENT.md.
+$localRoot = Join-Path (Split-Path -Parent $project) "local"
+$mcreator  = Join-Path $localRoot "mcreator"
+$out       = Join-Path $env:TEMP "kashi-validate"
 
 $javac = Join-Path $mcreator "jdk\bin\javac.exe"
 $java  = Join-Path $mcreator "jdk\bin\java.exe"
