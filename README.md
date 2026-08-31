@@ -86,8 +86,8 @@ performance guidance for firing many effects at once.
   understanding before changing anything.
 - [docs/ROADMAP.md](docs/ROADMAP.md) — what's done (including the historical Bedrock parity plan
   this plugin was built against) and what's next.
-- [CLAUDE.md](CLAUDE.md) — a short orientation file for an AI assistant (or new contributor)
-  opening this repository, pointing into the docs above.
+- [docs/CLAUDE.md](docs/CLAUDE.md) — a short orientation file for an AI assistant (or new
+  contributor) opening this repository, pointing into the docs above.
 
 ## License
 
