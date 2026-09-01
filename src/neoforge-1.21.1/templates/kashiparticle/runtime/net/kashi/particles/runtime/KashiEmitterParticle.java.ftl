@@ -109,7 +109,7 @@ public class KashiEmitterParticle extends Particle {
 
 	/**
 	 * As the no-offset constructor, with additive scale/duration offsets from the spawn that fired
-	 * this effect directly (an event-chained child always gets {@code 0, 0} â€” see the other
+	 * this effect directly (an event-chained child always gets {@code 0, 0} — see the other
 	 * constructor - a hit-effect triggered by a parent effect is its own authored effect, not a
 	 * continuation of whatever offset the parent's spawn happened to carry).
 	 */

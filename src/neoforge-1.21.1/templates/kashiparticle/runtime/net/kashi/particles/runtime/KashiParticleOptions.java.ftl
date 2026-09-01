@@ -56,7 +56,7 @@ public record KashiParticleOptions(ResourceLocation effectId, float dirX, float 
 
 	/**
 	 * Additive scale/duration offsets a spawn can apply on top of what the effect authored in
-	 * Snowstorm. Both default to {@code 0}, which is a no-op â€” per the plugin's governing rule,
+	 * Snowstorm. Both default to {@code 0}, which is a no-op — per the plugin's governing rule,
 	 * an unfilled offset always leaves Snowstorm as the source of truth.
 	 *
 	 * @param scaleOffset    added to the authored half-width/half-height every frame, floored at 0

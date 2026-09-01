@@ -483,7 +483,7 @@ public class KashiParticle extends Particle {
 		if (init != null)
 			this.effect.compile(init.perRender()).eval(this.context);
 
-		// scaleOffset is additive, not multiplicative (the user's call - "somar e subtrair, nÃ£o
+		// scaleOffset is additive, not multiplicative (the user's call - "somar e subtrair, não
 		// multiplicar"), floored at 0 so a large negative offset shrinks the particle away instead
 		// of flipping its sign and mirroring the quad. 0 is the default and leaves size untouched.
 		float halfW = Math.max(0, (float) this.sizeX.eval(this.context) + this.scaleOffset);

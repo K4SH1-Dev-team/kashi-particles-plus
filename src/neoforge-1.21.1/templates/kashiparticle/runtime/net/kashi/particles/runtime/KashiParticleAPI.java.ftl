@@ -64,7 +64,7 @@ public final class KashiParticleAPI {
 	 * The real implementation: names the entity the spawn came from and applies additive
 	 * scale/duration offsets. Every other overload delegates here.
 	 *
-	 * <p>On the server, {@link Level#addParticle} is a no-op â€” its body is empty on {@code Level}
+	 * <p>On the server, {@link Level#addParticle} is a no-op — its body is empty on {@code Level}
 	 * and {@code ServerLevel} does not override it, so calling it server-side never reaches a
 	 * client. {@link ServerLevel#sendParticles} is the real broadcast, and passing
 	 * {@code longDistance = true} widens the broadcast radius from 32 to 512 blocks, so a distant
