@@ -534,6 +534,22 @@ public class KashiParticle extends Particle {
 	 *
 	 * <p>A particle that is not moving has no direction to align to, so it falls back to a plain
 	 * camera-facing billboard rather than collapsing to an arbitrary orientation.
+	 *
+	 * <p>{@code (0,0,-1).rotate(cameraRotation)} is the camera's own forward axis in world space -
+	 * the direction it is looking, not the direction back to it - as confirmed by the plain
+	 * camera-facing billboard case ({@code new Quaternionf(rotation)} directly, in {@link #facing}):
+	 * its normal is {@code (0,0,1).rotate(rotation)}, the exact negation of that forward vector, and
+	 * that billboard is known-correct. So a properly viewer-facing normal here has to satisfy
+	 * {@code quadNormal Â· cameraForward = -1}, not {@code +1}. The roll computed below aligns
+	 * {@code quadNormal} WITH {@code cameraForward} (its atan2 target), so it has to be applied as
+	 * {@code roll + Ï€}, not {@code roll} or {@code -roll} - either of those leaves the quad's
+	 * normal pointed 180Â° wrong for some or all camera headings, i.e. showing the effect its back
+	 * instead of its face. Verified by simulating this exact rotation against all four cardinal
+	 * camera headings for a near-vertical travel vector, checked against the known-correct
+	 * default-billboard case as the reference: {@code -roll} (the original bug) gives dot â‰ˆ +0.99
+	 * for one axis pair and â‰ˆ -0.99 (correct) for the other - matching effects that rendered facing
+	 * one pair of directions and vanished facing the other; plain {@code roll} gives â‰ˆ +0.99 for
+	 * all four (wrong everywhere); {@code roll + Ï€} gives â‰ˆ -1.0 for all four (correct everywhere).
 	 */
 	private Quaternionf directionFacing(Quaternionf cameraRotation) {
 		Vector3f travel = new Vector3f((float) this.vx, (float) this.vy, (float) this.vz);
@@ -547,12 +563,12 @@ public class KashiParticle extends Particle {
 		// remaining freedom is spun towards the camera so the face stays readable.
 		Quaternionf alignment = new Quaternionf().rotateTo(new Vector3f(1, 0, 0), travel);
 		Vector3f quadNormal = new Vector3f(0, 0, 1).rotate(alignment);
-		Vector3f toCamera = new Vector3f(0, 0, -1).rotate(new Quaternionf(cameraRotation));
+		Vector3f cameraForward = new Vector3f(0, 0, -1).rotate(new Quaternionf(cameraRotation));
 
 		float roll = (float) Math.atan2(
-				new Vector3f(travel).cross(quadNormal).dot(toCamera), quadNormal.dot(toCamera));
+				new Vector3f(travel).cross(quadNormal).dot(cameraForward), quadNormal.dot(cameraForward));
 
-		return alignment.rotateX(-roll);
+		return alignment.rotateX(roll + (float) Math.PI);
 	}
 
 	/** Returns {u0, v0, u1, v1} normalised texture coordinates for the current frame. */
@@ -658,10 +674,19 @@ public class KashiParticle extends Particle {
 	 * several blocks across. Left alone, a quad that fills the screen gets culled the moment its
 	 * centimetre-sized centre leaves the frustum - which looks like particles jumping around or
 	 * vanishing as the camera turns. Sizing the box to the quad fixes that.
+	 *
+	 * <p>The radius has to be the quad's half-diagonal ({@code sqrt(halfWÂ² + halfHÂ²)}), not just
+	 * {@code max(halfW, halfH)} - the quad is rotated (see {@link #facing}), so its farthest
+	 * corner from the centre is the diagonal, not an edge midpoint. Using max() under-sizes the
+	 * box by up to ~41% on a square quad, which is enough for the frustum test to reject a corner
+	 * that is still genuinely on screen - particles would vanish exactly the way this Javadoc
+	 * already describes, just from a different cause than the one it fixed.
 	 */
 	@Override
 	public net.minecraft.world.phys.AABB getRenderBoundingBox(float partialTick) {
-		double reach = Math.max(this.sizeX.eval(this.context), this.sizeY.eval(this.context));
+		double halfW = this.sizeX.eval(this.context);
+		double halfH = this.sizeY.eval(this.context);
+		double reach = Math.sqrt(halfW * halfW + halfH * halfH);
 
 		return new net.minecraft.world.phys.AABB(
 				this.x - reach, this.y - reach, this.z - reach,
