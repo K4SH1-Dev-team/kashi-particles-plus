@@ -535,18 +535,21 @@ public class KashiParticle extends Particle {
 	 * <p>A particle that is not moving has no direction to align to, so it falls back to a plain
 	 * camera-facing billboard rather than collapsing to an arbitrary orientation.
 	 *
-	 * <p>The roll has to be applied as {@code +roll}, not {@code -roll}: {@code roll} is the angle
-	 * from the quad's current normal to the camera, measured with {@code cross(travel, quadNormal)}
-	 * as the sine axis, and rotating the quad by that same signed angle around its own travel axis
-	 * (now local +X after {@code alignment}) is what actually carries the normal onto the camera.
-	 * Getting the sign backwards here does not just roll the quad a little wrong - it faces the
-	 * quad's normal exactly away from the camera for one whole perpendicular pair of view
-	 * directions while looking correct for the other, so an effect using this facing mode (or
-	 * direction_x/y/z, which share this method) would render fine looking east/west and disappear
-	 * looking north/south, or vice versa, depending on its travel direction. Verified by simulating
-	 * this exact rotation for a near-vertical travel vector against all four cardinal camera
-	 * headings: {@code -roll} gives dot(normal, toCamera) â‰ˆ +0.99 for one axis pair and â‰ˆ -0.99
-	 * (facing squarely away) for the other; {@code +roll} gives â‰ˆ +1.0 for all four.
+	 * <p>{@code (0,0,-1).rotate(cameraRotation)} is the camera's own forward axis in world space -
+	 * the direction it is looking, not the direction back to it - as confirmed by the plain
+	 * camera-facing billboard case ({@code new Quaternionf(rotation)} directly, in {@link #facing}):
+	 * its normal is {@code (0,0,1).rotate(rotation)}, the exact negation of that forward vector, and
+	 * that billboard is known-correct. So a properly viewer-facing normal here has to satisfy
+	 * {@code quadNormal Â· cameraForward = -1}, not {@code +1}. The roll computed below aligns
+	 * {@code quadNormal} WITH {@code cameraForward} (its atan2 target), so it has to be applied as
+	 * {@code roll + Ï€}, not {@code roll} or {@code -roll} - either of those leaves the quad's
+	 * normal pointed 180Â° wrong for some or all camera headings, i.e. showing the effect its back
+	 * instead of its face. Verified by simulating this exact rotation against all four cardinal
+	 * camera headings for a near-vertical travel vector, checked against the known-correct
+	 * default-billboard case as the reference: {@code -roll} (the original bug) gives dot â‰ˆ +0.99
+	 * for one axis pair and â‰ˆ -0.99 (correct) for the other - matching effects that rendered facing
+	 * one pair of directions and vanished facing the other; plain {@code roll} gives â‰ˆ +0.99 for
+	 * all four (wrong everywhere); {@code roll + Ï€} gives â‰ˆ -1.0 for all four (correct everywhere).
 	 */
 	private Quaternionf directionFacing(Quaternionf cameraRotation) {
 		Vector3f travel = new Vector3f((float) this.vx, (float) this.vy, (float) this.vz);
@@ -560,12 +563,12 @@ public class KashiParticle extends Particle {
 		// remaining freedom is spun towards the camera so the face stays readable.
 		Quaternionf alignment = new Quaternionf().rotateTo(new Vector3f(1, 0, 0), travel);
 		Vector3f quadNormal = new Vector3f(0, 0, 1).rotate(alignment);
-		Vector3f toCamera = new Vector3f(0, 0, -1).rotate(new Quaternionf(cameraRotation));
+		Vector3f cameraForward = new Vector3f(0, 0, -1).rotate(new Quaternionf(cameraRotation));
 
 		float roll = (float) Math.atan2(
-				new Vector3f(travel).cross(quadNormal).dot(toCamera), quadNormal.dot(toCamera));
+				new Vector3f(travel).cross(quadNormal).dot(cameraForward), quadNormal.dot(cameraForward));
 
-		return alignment.rotateX(roll);
+		return alignment.rotateX(roll + (float) Math.PI);
 	}
 
 	/** Returns {u0, v0, u1, v1} normalised texture coordinates for the current frame. */
