@@ -314,14 +314,22 @@ public class KashiParticle extends Particle {
 		double dt = 1.0 / 20.0;
 
 		if (motion != null) {
-			double ax = this.effect.compile(motion.linearAcceleration().x()).eval(this.context);
-			double ay = this.effect.compile(motion.linearAcceleration().y()).eval(this.context);
-			double az = this.effect.compile(motion.linearAcceleration().z()).eval(this.context);
+			Vector3f accel = new Vector3f(
+					(float) this.effect.compile(motion.linearAcceleration().x()).eval(this.context),
+					(float) this.effect.compile(motion.linearAcceleration().y()).eval(this.context),
+					(float) this.effect.compile(motion.linearAcceleration().z()).eval(this.context));
+
+			// Authored in emitter-local axes, same as particle_initial_speed's explicit velocity
+			// and motion_parametric's relative_position - has to turn with the same aim that
+			// turned those, or an effect that curves "forward" as authored would curve toward
+			// world -Z regardless of which way it was actually fired.
+			this.emitter.rotateByAim(accel);
+
 			double drag = this.effect.compile(motion.linearDrag()).eval(this.context);
 
-			this.vx += ax * dt;
-			this.vy += ay * dt;
-			this.vz += az * dt;
+			this.vx += accel.x() * dt;
+			this.vy += accel.y() * dt;
+			this.vz += accel.z() * dt;
 
 			double keep = Math.max(0, 1 - drag * dt);
 			this.vx *= keep;
