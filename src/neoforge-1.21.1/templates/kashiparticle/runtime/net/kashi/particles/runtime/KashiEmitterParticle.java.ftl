@@ -717,7 +717,7 @@ public class KashiEmitterParticle extends Particle {
 	 * Builds the rotation that aims the effect along a direction.
 	 *
 	 * <p>A Bedrock effect's authored "forward" is <b>-Z</b> (the direction its offsets and motion
-	 * travel), so aiming maps -Z onto the requested direction. Mapping the wrong axis â€” e.g. +Y â€”
+	 * travel), so aiming maps -Z onto the requested direction. Mapping the wrong axis — e.g. +Y —
 	 * tips the whole effect on its side, throwing particles out of view. A zero direction means
 	 * "no aim": the effect plays in its natural orientation, exactly as authored in Snowstorm.
 	 */

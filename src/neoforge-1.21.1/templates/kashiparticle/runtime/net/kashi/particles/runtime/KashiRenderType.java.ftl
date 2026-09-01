@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>The particle engine batches particles by render-type identity: it calls {@link #begin} once,
  * draws every particle that returns the same instance, then ends. So instances are interned by
- * (texture, blend) â€” two particles sharing a texture and blend share one batch, which is both
+ * (texture, blend) — two particles sharing a texture and blend share one batch, which is both
  * correct and fast. Additive blends must not be batched with alpha ones.
  */
 public final class KashiRenderType implements ParticleRenderType {

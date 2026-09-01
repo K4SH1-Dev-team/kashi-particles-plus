@@ -81,7 +81,7 @@ public final class KashiCompiledEffect {
 	 * Recomputes every curve into {@code context}, so the expressions evaluated next see current
 	 * values.
 	 *
-	 * <p>Call this before reading anything from a context that has just had its clock advanced â€”
+	 * <p>Call this before reading anything from a context that has just had its clock advanced —
 	 * on the emitter each emitter tick, on a particle each particle tick and each frame. A curve's
 	 * input is evaluated in the context it is being applied to, which is what lets the same effect
 	 * hold one curve driven by {@code v.emitter_age} and another by {@code v.particle_age}.

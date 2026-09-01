@@ -10,7 +10,7 @@ import net.kashi.particles.core.molang.MolangValue;
  * A MoLang expression exactly as it appeared in the {@code .particle.json}.
  *
  * <p>Milestone 1 stores only the raw source, plus a pre-resolved value for the common case
- * where the JSON held a plain number. Compilation and evaluation arrive in milestone 2 â€”
+ * where the JSON held a plain number. Compilation and evaluation arrive in milestone 2 —
  * nothing here evaluates anything.
  *
  * <p>The source is kept verbatim, aliases and all. Bedrock lets {@code v.} stand in for

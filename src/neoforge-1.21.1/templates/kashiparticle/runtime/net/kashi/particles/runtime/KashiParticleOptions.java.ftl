@@ -22,7 +22,7 @@ import net.minecraft.resources.ResourceLocation;
  * packet; the stream codec is what crosses the wire.
  *
  * <p>{@link #entityId} travels rather than an entity reference, because the entity object on the
- * firing side is not the one the client renders â€” the client resolves the id against its own level.
+ * firing side is not the one the client renders — the client resolves the id against its own level.
  * It is only consulted by effects that declare {@code minecraft:emitter_local_space}.
  *
  * <p>{@link #extras} carries the additive scale/duration offsets (see {@link Extras}). They are

@@ -4,7 +4,7 @@ package net.kashi.particles.core;
  * Samples a Bedrock curve, the thing behind Snowstorm's "Variables &amp; Curves" tab.
  *
  * <p>A curve turns one MoLang input into a {@code variable.*} an effect can read anywhere else, so
- * getting the sampling wrong does not fail loudly â€” it quietly returns the wrong number, and an
+ * getting the sampling wrong does not fail loudly — it quietly returns the wrong number, and an
  * effect that drives its size from a curve simply vanishes. The maths here therefore follows
  * Wintersky's {@code calculateCurve} exactly rather than a plausible reading of the docs.
  *
@@ -122,7 +122,7 @@ public final class CurveSampler {
 	 * Samples a {@code bezier_chain} at the normalised input {@code t}.
 	 *
 	 * <p>Each span between consecutive keys is a cubic Hermite segment, its control points placed a
-	 * third of the span away along the keys' slopes â€” the standard reading of Bedrock's
+	 * third of the span away along the keys' slopes — the standard reading of Bedrock's
 	 * value/slope pairs. Keys must be sorted by {@link ChainKey#time}.
 	 */
 	public static double sampleChain(double t, ChainKey[] keys) {
