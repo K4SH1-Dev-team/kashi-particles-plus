@@ -642,11 +642,22 @@ public final class MolangCompiler {
 					: args.size() == 1 ? args.get(0) : constant(1);
 			MolangValue seed = args.size() >= 3 ? args.get(2) : null;
 
+			// A seeded call (rare - 3-argument math.random) gets its own Random, compiled once and
+			// reseeded on every evaluation rather than reallocated: setSeed(x) puts the generator in
+			// exactly the same state a fresh `new Random(x)` would, without an eval() that allocates.
+			Random seeded = seed != null ? new Random() : null;
+
 			return context -> {
 				double from = low.eval(context);
 				double to = high.eval(context);
-				double roll = seed == null ? RANDOM.nextDouble()
-						: new Random((long) seed.eval(context)).nextDouble();
+				double roll;
+
+				if (seed == null) {
+					roll = RANDOM.nextDouble();
+				} else {
+					seeded.setSeed((long) seed.eval(context));
+					roll = seeded.nextDouble();
+				}
 
 				return integer ? Math.floor(from + roll * (Math.floor(to) - Math.floor(from) + 1))
 						: from + roll * (to - from);
