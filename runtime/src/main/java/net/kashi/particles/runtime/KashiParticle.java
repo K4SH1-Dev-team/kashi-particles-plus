@@ -658,10 +658,19 @@ public class KashiParticle extends Particle {
 	 * several blocks across. Left alone, a quad that fills the screen gets culled the moment its
 	 * centimetre-sized centre leaves the frustum - which looks like particles jumping around or
 	 * vanishing as the camera turns. Sizing the box to the quad fixes that.
+	 *
+	 * <p>The radius has to be the quad's half-diagonal ({@code sqrt(halfW² + halfH²)}), not just
+	 * {@code max(halfW, halfH)} - the quad is rotated (see {@link #facing}), so its farthest
+	 * corner from the centre is the diagonal, not an edge midpoint. Using max() under-sizes the
+	 * box by up to ~41% on a square quad, which is enough for the frustum test to reject a corner
+	 * that is still genuinely on screen - particles would vanish exactly the way this Javadoc
+	 * already describes, just from a different cause than the one it fixed.
 	 */
 	@Override
 	public net.minecraft.world.phys.AABB getRenderBoundingBox(float partialTick) {
-		double reach = Math.max(this.sizeX.eval(this.context), this.sizeY.eval(this.context));
+		double halfW = this.sizeX.eval(this.context);
+		double halfH = this.sizeY.eval(this.context);
+		double reach = Math.sqrt(halfW * halfW + halfH * halfH);
 
 		return new net.minecraft.world.phys.AABB(
 				this.x - reach, this.y - reach, this.z - reach,
