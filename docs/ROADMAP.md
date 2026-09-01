@@ -2,9 +2,11 @@
 
 ## Onde estamos
 
-**v1.0.0** — paridade completa com o Snowstorm 3.2.2 para o formato `.particle.json`, endurecido
-para uso em produção em workspaces diferentes da de desenvolvimento. Ver histórico completo
-abaixo.
+**v2.0.0** publicado ([Releases](https://github.com/K4SH1-Dev-team/kashi-particles-plus/releases))
+— paridade completa com o Snowstorm 3.2.2 para o formato `.particle.json`, endurecido para uso em
+produção em workspaces diferentes da de desenvolvimento, mais escala/duração aditivos e broadcast
+confiável em multiplayer. Desde então, suporte ao gerador NeoForge 1.21.8 (V2.5, ainda não
+versionado numa release). Ver histórico completo abaixo.
 
 ## Próximas fases
 
@@ -55,12 +57,34 @@ Descartado ou adiado desta lista, com o motivo:
   nem mexer em internals de render). Suporte a GeckoLib, Player Animator e entidades não-biped
   fica para avaliação futura separada, possivelmente descartado.
 
+### V2.5 — Porte para NeoForge 1.21.8 (concluída)
+O MCreator 2026.1.x já oferece o gerador NeoForge 1.21.8 além do 1.21.1; o plugin agora suporta os
+dois lado a lado (nenhum foi substituído). Investigação feita contra a API real dos dois geradores
+(`javap`/leitura de fonte a partir dos jars "merged" reais de cada workspace de teste, não
+suposição): a esmagadora maioria do `runtime/` (11 de 13 arquivos) é idêntica entre as duas
+versões — só 5 arquivos genuinamente divergem, isolados numa pasta de overlay
+(`runtime-1.21.8/`) em vez de duplicar a árvore inteira:
+
+- `KashiParticleAPI.java` — `ServerLevel.sendParticles` ganhou um parâmetro booleano a mais
+  (`alwaysShow`) no 1.21.8; o antigo `longDistance` virou `overrideLimiter`, mesmo papel.
+- `KashiRenderType.java` — `ParticleRenderType` é uma interface no 1.21.1 e virou um `record` no
+  1.21.8 (não dá mais pra implementar); o sistema de blend do Minecraft passou de imperativo
+  (`RenderSystem`/`GlStateManager`) para declarativo (`RenderPipeline`/`BlendFunction`). Reescrito
+  seguindo o mesmo padrão que o próprio vanilla usa pros particles dele.
+- `KashiParticlesRuntime.java`, `KashiParticleClient.java`, `KashiDebugCommand.java` — o atributo
+  `bus` de `@EventBusSubscriber` foi removido no 1.21.8; o bus correto agora é inferido
+  automaticamente por tipo de evento (`IModBusEvent` → mod bus, senão → game bus), então essas 3
+  classes só deixam de declarar `bus` explicitamente — o roteamento continua o mesmo.
+
+Ver [ARCHITECTURE.md](ARCHITECTURE.md) — "Two generators, one shared runtime" para o mecanismo de
+overlay, e [DEVELOPMENT.md](DEVELOPMENT.md) para as duas workspaces de teste
+(`kashi_particle_test` / `teste_vinte_oito`).
+
 ### Fase 4 — Porte para MCreator 2026.2
-Novos geradores: NeoForge 1.21.8, 26.1 e 26.2. Hoje o plugin implementa só o gerador
-`neoforge-1.21.1` (ver [ARCHITECTURE.md](ARCHITECTURE.md)) — portar significa duplicar (ou
-parametrizar) `src/neoforge-1.21.1/` para cada novo par gerador/versão, e revalidar que o
-`runtime/` compila contra cada API de Minecraft alvo (o MoLang engine em `core/` não depende de
-Minecraft, então essa parte deve migrar sem atrito).
+Novos geradores: NeoForge 26.1 e 26.2 (o 1.21.8 já foi feito na V2.5 acima). Mesmo mecanismo de
+overlay já estabelecido deve se aplicar — criar `src/neoforge-26.x/`, uma nova workspace de teste
+por versão, e revalidar contra a API real de cada uma antes de assumir que algo compila (o MoLang
+engine em `core/` não depende de Minecraft, então essa parte deve migrar sem atrito).
 
 ---
 
