@@ -36,9 +36,10 @@ it pre-compiled. Firing it:
    `applyParametricMotion`, curves, collision) and, separately, a per-*frame* `render()` — the
    distinction matters because ticks run at a fixed 20/s but frames don't, so anything that must
    look smooth (position, colour interpolation) is computed in `render()`, not just on tick.
-4. **`KashiRenderType`** picks the GL blend function from the effect's Bedrock `material`
+4. **`KashiRenderType`** picks the GL blend state from the effect's Bedrock `material`
    (`particles_add` → additive, `particles_blend` → straight alpha, `particles_alpha`/
-   `_opaque` → alpha-tested with blending off, for a crisp cutout edge instead of a soft one).
+   `_opaque` → alpha-tested with blending off, for a crisp cutout edge instead of a soft one). How
+   it does that is one of the two files that differ per generator - see "Two generators" below.
 
 ## The generation pipeline
 
@@ -47,9 +48,9 @@ runtime/src/main/java/...        (plain Java, package net.kashi.particles.runtim
         │
         │  tools/make-runtime-templates.ps1
         ▼
-src/neoforge-1.21.1/templates/kashiparticle/runtime/...*.java.ftl
+src/<generator>/templates/kashiparticle/runtime/...*.java.ftl   (one copy per generator)
         │
-        │  declared as global_templates in kashiparticle.definition.yaml
+        │  declared as global_templates in that generator's kashiparticle.definition.yaml
         │  (regenerated whenever a workspace has ≥1 KASHI Particle element)
         ▼
 <user's mod>/src/main/java/net/kashi/particles/runtime/...   (real .java, compiled with their mod)
@@ -66,12 +67,50 @@ twice — once by the wizard at import time (compiled Java), once by the generat
 registration time (templated Java) — which is why a parse error is always caught at import,
 never as a surprise mod crash.
 
-`src/neoforge-1.21.1/kashiparticle.definition.yaml` is itself generated (by the same script) from
-that file list — don't hand-edit it.
+Each generator's `kashiparticle.definition.yaml` is itself generated (by the same script) from
+that generator's file list — don't hand-edit it.
+
+### Two generators, one shared runtime
+
+This plugin ships two generators, `neoforge-1.21.1` and `neoforge-1.21.8` (see
+[DEVELOPMENT.md](DEVELOPMENT.md) for the two test workspaces that back them). `runtime/` is one
+source tree, not two — almost every file templates identically for both, because almost the entire
+Minecraft/NeoForge API surface this plugin touches is unchanged between the two versions
+(confirmed method-by-method against the real API of each, not assumed).
+
+The handful of files where it genuinely isn't unchanged live in a per-generator **overlay**
+directory (`runtime-1.21.8/src/main/java/net/kashi/particles/runtime/...`, mirroring `runtime/`'s
+own layout) rather than as a second copy of the whole tree. `make-runtime-templates.ps1` and
+`sync-core-to-workspace.ps1` both walk `runtime/` as usual, but for the 1.21.8 generator/workspace,
+any file that also exists in the overlay is used in its place - so a change to a shared file (the
+other 11 of 13, as of this writing) only has to be made once, and only the files that truly differ
+are duplicated. As of this writing that's:
+
+- **`KashiParticleAPI.java`** — `ServerLevel.sendParticles` gained an extra `alwaysShow` boolean
+  parameter between 1.21.1 and 1.21.8 (the old `longDistance` parameter was renamed
+  `overrideLimiter`, same role - still the 32-vs-512-block broadcast radius).
+- **`KashiRenderType.java`** — `ParticleRenderType` is an interface in 1.21.1 (implemented here,
+  driving GL blend state imperatively through `RenderSystem`/`GlStateManager`) and a `record` in
+  1.21.8 (can no longer be implemented; Minecraft's own particle render types are built
+  declaratively instead, from a `RenderPipeline` + `BlendFunction`). The 1.21.8 file follows that
+  same declarative pattern - each blend mode maps to the same `RenderType`/`RenderPipeline` shape
+  vanilla itself uses for its own particles, confirmed against the real 1.21.8 source rather than
+  guessed.
+- **`KashiParticlesRuntime.java`, `KashiParticleClient.java`, `KashiDebugCommand.java`** — each
+  only differs in its `@EventBusSubscriber` annotation. 1.21.1 selects the event bus explicitly
+  (`bus = EventBusSubscriber.Bus.MOD`/`.GAME`); 1.21.8 removed that attribute entirely - which bus
+  a subscriber uses is now inferred per event from whether the event type implements
+  `IModBusEvent`, so the 1.21.8 files simply omit `bus` and get the same routing automatically.
+
+Both generators' procedure templates (`src/<generator>/procedures/*.java.ftl`) and the two
+non-runtime templates (`particle.json.ftl`, `KashiParticleEffects.java.ftl`) are, by contrast,
+identical byte-for-byte between generators - they only touch APIs that never diverged - so those
+are plain copies, not generated, and only need updating in both places if one is ever edited.
 
 ## Resolving which effect a procedure fires
 
-The three procedure templates (`src/neoforge-1.21.1/procedures/*.java.ftl`) need to turn "the
+The three procedure templates (`src/<generator>/procedures/*.java.ftl`, identical for every
+generator - see above) need to turn "the
 `CUSTOM:` reference to a KASHI Particle mod element" into the exact `ResourceLocation` path
 MCreator will register that element's effect under. This was the single most expensive thing to
 get right in this project, so it's worth writing down clearly:

@@ -23,9 +23,12 @@ Otherwise follow the branch → PR → maintainer-merges workflow in DEVELOPMENT
   MCreator/Minecraft dependency. Compiled directly into the plugin *and* templated into every
   generated mod (see ARCHITECTURE.md — "The generation pipeline").
 - `runtime/` — the mod-side particle engine (spawn/tick/render, render types, debug command).
-  Templated into every generated mod almost verbatim; never compiled into the plugin itself.
-- `src/` — the actual MCreator plugin payload (`plugin.json`, lang strings, the
-  `neoforge-1.21.1` generator's templates/definition, procedure block definitions, themes).
+  Templated into every generated mod almost verbatim; never compiled into the plugin itself. Two
+  generators share this one tree; a handful of files that genuinely differ between them live in
+  `runtime-1.21.8/` instead of a second copy of the whole thing — see ARCHITECTURE.md — "Two
+  generators, one shared runtime".
+- `src/` — the actual MCreator plugin payload (`plugin.json`, lang strings, each generator's own
+  `neoforge-1.21.1`/`neoforge-1.21.8` templates/definition, procedure block definitions, themes).
 - `src-java/` — the plugin's own Java: the mod element type, its wizard GUI, plugin entry point.
   Compiled against `mcreator.exe` (MCreator's classes live inside the exe, not in a `lib/` jar —
   see DEVELOPMENT.md).
@@ -55,6 +58,18 @@ Otherwise follow the branch → PR → maintainer-merges workflow in DEVELOPMENT
 - **`generator.map(field, "datalistName")` does not resolve a datalist the plugin defines
   itself** — only MCreator's own built-in ones (sounds, projectiles). It looked like the "correct"
   API and crashed the game or resolved to the wrong element. See ARCHITECTURE.md.
+- **`@EventBusSubscriber(bus = ...)` does not exist in NeoForge 1.21.8** (it does in 1.21.1).
+  Confirmed against the real 1.21.8 source: which event bus a subscriber uses is now inferred per
+  event from whether the event type implements `IModBusEvent`, not declared on the annotation.
+  Omitting `bus` entirely is the 1.21.8-correct form and reproduces the exact same routing.
+- **`tools/check-mod-compile.ps1` type-checks against the workspace's own `build/moddev/
+  clientLegacyClasspath.txt`, not a blind scan of `~/.mcreator/gradle/caches`.** Two test
+  workspaces share that cache; a bare scan can pick up two different versions of the same library
+  and resolve symbols against the wrong one. Also always pass `-sourcepath` pointed at just the
+  workspace's own sources: the merged jar bundles a `.java` next to the `.class` for some NeoForge
+  classes, and without an explicit `-sourcepath`, javac defaults it to the classpath, finds those,
+  and type-checks them too - `-implicit:none` does **not** stop this (it only suppresses writing
+  their `.class` output, not the type-checking itself, confirmed by trying it first).
 
 ## Docs
 
