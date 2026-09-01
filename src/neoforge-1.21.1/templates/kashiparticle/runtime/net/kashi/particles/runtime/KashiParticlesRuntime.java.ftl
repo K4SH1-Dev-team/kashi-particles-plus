@@ -11,7 +11,7 @@ import net.minecraft.resources.ResourceLocation;
  * Common-side registration for the KASHI particle system.
  *
  * <p>All KASHI effects spawn under one {@link KashiParticleType}; it is registered here on the mod
- * event bus. Client-only concerns â€” the render provider and the compiled effect registry â€” live in
+ * event bus. Client-only concerns — the render provider and the compiled effect registry — live in
  * {@link KashiParticleClient}.
  */
 @EventBusSubscriber(modid = KashiParticlesRuntime.MODID, bus = EventBusSubscriber.Bus.MOD)

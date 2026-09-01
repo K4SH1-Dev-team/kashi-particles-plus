@@ -9,7 +9,7 @@ import net.minecraft.world.phys.Vec3;
 /**
  * The one entry point procedures call to fire a KASHI effect.
  *
- * <p>Everything about the effect â€” duration, motion, animation, colour â€” comes from the imported
+ * <p>Everything about the effect — duration, motion, animation, colour — comes from the imported
  * {@code .particle.json}. A spawn only says which effect, where, and (optionally) which way it is
  * aimed; it configures nothing.
  */
@@ -61,11 +61,11 @@ public final class KashiParticleAPI {
 	 * the effect as a whole is rotated in the world:
 	 *
 	 * <ul>
-	 * <li>{@link #AIM_NONE} â€” world orientation, up stays up. What AOE effects need, and what makes
+	 * <li>{@link #AIM_NONE} — world orientation, up stays up. What AOE effects need, and what makes
 	 *     an {@code emitter_transform_*} effect readable instead of edge-on.</li>
-	 * <li>{@link #AIM_HORIZONTAL} â€” turns with the entity but never tilts, so looking up or down
+	 * <li>{@link #AIM_HORIZONTAL} — turns with the entity but never tilts, so looking up or down
 	 *     does not send the effect up or down.</li>
-	 * <li>{@link #AIM_FULL} â€” follows the whole look direction, pitch included.</li>
+	 * <li>{@link #AIM_FULL} — follows the whole look direction, pitch included.</li>
 	 * </ul>
 	 *
 	 * <p>The offset is measured in the entity's own frame - {@code forward} is where it is facing

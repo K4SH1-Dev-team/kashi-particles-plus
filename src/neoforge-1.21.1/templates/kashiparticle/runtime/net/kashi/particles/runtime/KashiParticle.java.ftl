@@ -24,8 +24,8 @@ import java.util.List;
 /**
  * One visible KASHI billboard.
  *
- * <p>Reproduces the Bedrock particle as Wintersky (Snowstorm's runtime) does: spawn-time values â€”
- * the four particle randoms, the lifetime, and the initial rotation â€” are frozen at birth, while
+ * <p>Reproduces the Bedrock particle as Wintersky (Snowstorm's runtime) does: spawn-time values —
+ * the four particle randoms, the lifetime, and the initial rotation — are frozen at birth, while
  * size, tint and the flipbook frame are re-evaluated every frame against the particle's MoLang
  * context. Bedrock times are in seconds; Minecraft ticks are 1/20 s, so ages are converted.
  */
@@ -172,7 +172,7 @@ public class KashiParticle extends Particle {
 	 * Ends the particle, firing its expiration events first.
 	 *
 	 * <p>A particle that spawns something where it died is how trails and impacts are built, so
-	 * this has to happen before removal and exactly once â€” every path out of a particle's life
+	 * this has to happen before removal and exactly once — every path out of a particle's life
 	 * comes through here.
 	 */
 	private void expire() {
@@ -248,7 +248,7 @@ public class KashiParticle extends Particle {
 	}
 
 	/**
-	 * Carries the particle along with an emitter that is following an entity â€”
+	 * Carries the particle along with an emitter that is following an entity —
 	 * {@code minecraft:emitter_local_space}.
 	 *
 	 * <p>Position is carried by moving the particle the same amount the emitter moved; rotation by
@@ -371,7 +371,7 @@ public class KashiParticle extends Particle {
 	}
 
 	/**
-	 * Moves the particle one step against the world â€” {@code minecraft:particle_motion_collision}.
+	 * Moves the particle one step against the world — {@code minecraft:particle_motion_collision}.
 	 *
 	 * <p>Each axis is resolved on its own so a particle sliding along a floor keeps its horizontal
 	 * speed instead of stopping dead the moment it lands. On contact the axis' speed is reflected by
@@ -572,16 +572,16 @@ public class KashiParticle extends Particle {
 	 * camera-facing billboard case ({@code new Quaternionf(rotation)} directly, in {@link #facing}):
 	 * its normal is {@code (0,0,1).rotate(rotation)}, the exact negation of that forward vector, and
 	 * that billboard is known-correct. So a properly viewer-facing normal here has to satisfy
-	 * {@code quadNormal Â· cameraForward = -1}, not {@code +1}. The roll computed below aligns
+	 * {@code quadNormal · cameraForward = -1}, not {@code +1}. The roll computed below aligns
 	 * {@code quadNormal} WITH {@code cameraForward} (its atan2 target), so it has to be applied as
-	 * {@code roll + Ï€}, not {@code roll} or {@code -roll} - either of those leaves the quad's
-	 * normal pointed 180Â° wrong for some or all camera headings, i.e. showing the effect its back
+	 * {@code roll + π}, not {@code roll} or {@code -roll} - either of those leaves the quad's
+	 * normal pointed 180° wrong for some or all camera headings, i.e. showing the effect its back
 	 * instead of its face. Verified by simulating this exact rotation against all four cardinal
 	 * camera headings for a near-vertical travel vector, checked against the known-correct
-	 * default-billboard case as the reference: {@code -roll} (the original bug) gives dot â‰ˆ +0.99
-	 * for one axis pair and â‰ˆ -0.99 (correct) for the other - matching effects that rendered facing
-	 * one pair of directions and vanished facing the other; plain {@code roll} gives â‰ˆ +0.99 for
-	 * all four (wrong everywhere); {@code roll + Ï€} gives â‰ˆ -1.0 for all four (correct everywhere).
+	 * default-billboard case as the reference: {@code -roll} (the original bug) gives dot ≈ +0.99
+	 * for one axis pair and ≈ -0.99 (correct) for the other - matching effects that rendered facing
+	 * one pair of directions and vanished facing the other; plain {@code roll} gives ≈ +0.99 for
+	 * all four (wrong everywhere); {@code roll + π} gives ≈ -1.0 for all four (correct everywhere).
 	 */
 	private Quaternionf directionFacing(Quaternionf cameraRotation) {
 		this.travelScratch.set((float) this.vx, (float) this.vy, (float) this.vz);
@@ -720,7 +720,7 @@ public class KashiParticle extends Particle {
 	 * centimetre-sized centre leaves the frustum - which looks like particles jumping around or
 	 * vanishing as the camera turns. Sizing the box to the quad fixes that.
 	 *
-	 * <p>The radius has to be the quad's half-diagonal ({@code sqrt(halfWÂ² + halfHÂ²)}), not just
+	 * <p>The radius has to be the quad's half-diagonal ({@code sqrt(halfW² + halfH²)}), not just
 	 * {@code max(halfW, halfH)} - the quad is rotated (see {@link #facing}), so its farthest
 	 * corner from the centre is the diagonal, not an edge midpoint. Using max() under-sizes the
 	 * box by up to ~41% on a square quad, which is enough for the frustum test to reject a corner

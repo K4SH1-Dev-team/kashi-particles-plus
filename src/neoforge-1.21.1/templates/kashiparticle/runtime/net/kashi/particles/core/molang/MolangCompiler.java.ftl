@@ -16,7 +16,7 @@ import java.util.Random;
  *
  * <p>Semantics follow Bedrock as implemented by Wintersky, the runtime behind Snowstorm. The
  * details that matter and are easy to get wrong: trigonometry is in <b>degrees</b>, and
- * {@code math.random} re-rolls on every evaluation rather than being fixed per particle â€”
+ * {@code math.random} re-rolls on every evaluation rather than being fixed per particle —
  * freezing a random value is the caller's job, done by evaluating spawn expressions once.
  */
 public final class MolangCompiler {
@@ -30,7 +30,7 @@ public final class MolangCompiler {
 
 	/**
 	 * Reserves the slot a named {@code variable.*} lives in, so something outside the expression
-	 * language â€” a curve â€” can write to the same place an expression reads from.
+	 * language — a curve — can write to the same place an expression reads from.
 	 *
 	 * @throws MolangSyntaxException if the name is one of Bedrock's built-in variables, which are
 	 *                               driven by the runtime and must not be overwritten
@@ -504,7 +504,7 @@ public final class MolangCompiler {
 	/**
 	 * Folds {@code v.} onto {@code variable.} and {@code q.} onto {@code query.}.
 	 *
-	 * <p>Bedrock treats these as the same name and real effects mix both spellings in one file â€”
+	 * <p>Bedrock treats these as the same name and real effects mix both spellings in one file —
 	 * the reference effect writes {@code variable.emitter_age} in one component and
 	 * {@code v.particle_age} in another. Without this they would be two separate variables.
 	 */

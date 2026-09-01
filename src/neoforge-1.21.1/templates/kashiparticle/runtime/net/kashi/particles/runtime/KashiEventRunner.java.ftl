@@ -11,7 +11,7 @@ import net.minecraft.world.entity.Entity;
 import java.util.List;
 
 /**
- * Fires a named event from a {@code .particle.json} â€” Snowstorm's Events tab.
+ * Fires a named event from a {@code .particle.json} — Snowstorm's Events tab.
  *
  * <p>An event is how one effect starts another: a slash spawns its own sparks, which spawn their
  * own smoke. That makes it the one part of an effect that can spawn work without bound, so the
@@ -37,7 +37,7 @@ final class KashiEventRunner {
 	/**
 	 * Runs every event in {@code names}.
 	 *
-	 * @param context the MoLang context of whatever fired this â€” the emitter for an emitter event,
+	 * @param context the MoLang context of whatever fired this — the emitter for an emitter event,
 	 *                the particle for a particle one, so an expression node writes where it should
 	 * @param anchor  the entity the firing effect follows, passed on so a bound child follows it too
 	 * @param depth   how many events deep this already is

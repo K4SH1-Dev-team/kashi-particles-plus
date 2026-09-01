@@ -18,7 +18,7 @@ import java.util.Map;
  * holding its raw source, so parsing stays free of any evaluation concern. Milestone 2 compiles
  * those expressions; milestone 3+ renders them.
  *
- * <p>Components the parser does not understand are not fatal â€” they are collected into
+ * <p>Components the parser does not understand are not fatal — they are collected into
  * {@link #unsupported()} so the import wizard can warn that fidelity will be incomplete,
  * rather than rejecting an effect outright over one exotic component.
  */
@@ -49,7 +49,7 @@ public record KashiParticleDefinition(
 		List<Unsupported> unsupported) {
 
 	/**
-	 * {@code minecraft:particle_motion_collision} â€” Snowstorm's "Collide" checkbox and its settings.
+	 * {@code minecraft:particle_motion_collision} — Snowstorm's "Collide" checkbox and its settings.
 	 *
 	 * @param drag         speed lost on contact, as a fraction per second of contact
 	 * @param restitution  how much of the incoming speed bounces back; 0 means it stops dead
@@ -60,7 +60,7 @@ public record KashiParticleDefinition(
 			boolean expireOnContact, List<String> events) {}
 
 	/**
-	 * {@code minecraft:particle_kill_plane} â€” a plane {@code ax + by + cz + d = 0}, in emitter
+	 * {@code minecraft:particle_kill_plane} — a plane {@code ax + by + cz + d = 0}, in emitter
 	 * space, that kills any particle crossing to its negative side.
 	 */
 	public record KillPlane(double a, double b, double c, double d) {}
@@ -82,7 +82,7 @@ public record KashiParticleDefinition(
 	}
 
 	/**
-	 * One entry of {@code particle_effect.events} â€” a named thing an effect can make happen.
+	 * One entry of {@code particle_effect.events} — a named thing an effect can make happen.
 	 *
 	 * <p>An event is a tree, not a single action: {@link Sequence} runs its children in order and
 	 * {@link Randomize} picks one by weight, and either may hold more of the same.
@@ -93,17 +93,17 @@ public record KashiParticleDefinition(
 		record Effect(String effect, EffectType type, MolangExpr preEffectExpression)
 				implements EventNode {}
 
-		/** {@code sound_effect} â€” names a Bedrock sound event, which has no Java equivalent. */
+		/** {@code sound_effect} — names a Bedrock sound event, which has no Java equivalent. */
 		record Sound(String eventName) implements EventNode {}
 
-		/** {@code expression} â€” MoLang run for its side effects, i.e. to set a variable. */
+		/** {@code expression} — MoLang run for its side effects, i.e. to set a variable. */
 		record Expression(MolangExpr expression) implements EventNode {}
 
 		record Sequence(List<EventNode> nodes) implements EventNode {}
 
 		record Randomize(List<Weighted> options) implements EventNode {}
 
-		/** {@code log} â€” a debug print in Bedrock. Kept so it round-trips, never acted on. */
+		/** {@code log} — a debug print in Bedrock. Kept so it round-trips, never acted on. */
 		record Log(String message) implements EventNode {}
 	}
 
@@ -118,7 +118,7 @@ public record KashiParticleDefinition(
 	public enum EffectType { EMITTER, EMITTER_BOUND, PARTICLE, PARTICLE_WITH_VELOCITY }
 
 	/**
-	 * {@code minecraft:emitter_lifetime_events} and {@code minecraft:particle_lifetime_events} â€”
+	 * {@code minecraft:emitter_lifetime_events} and {@code minecraft:particle_lifetime_events} —
 	 * which named events fire, and when.
 	 *
 	 * <p>Every field holds event names rather than nodes: Bedrock lets one event be triggered from
@@ -137,7 +137,7 @@ public record KashiParticleDefinition(
 		}
 	}
 
-	/** Event names that fire once the emitter passes {@link #at} â€” seconds, or blocks travelled. */
+	/** Event names that fire once the emitter passes {@link #at} — seconds, or blocks travelled. */
 	public record TimedEvents(double at, List<String> events) {}
 
 	/**
@@ -171,7 +171,7 @@ public record KashiParticleDefinition(
 	}
 
 	/**
-	 * {@code minecraft:emitter_local_space} â€” Snowstorm's "Space" panel.
+	 * {@code minecraft:emitter_local_space} — Snowstorm's "Space" panel.
 	 *
 	 * <p>Only meaningful while the emitter is moving, which for an imported effect means one fired
 	 * from an entity: with {@link #position} the whole effect travels with that entity instead of
@@ -179,7 +179,7 @@ public record KashiParticleDefinition(
 	 * {@link #velocity} particles are born already carrying the entity's motion.
 	 *
 	 * <p>An effect that declares none of them is world-space, and a spawn that names no entity has
-	 * nothing to be local to â€” in both cases this component changes nothing.
+	 * nothing to be local to — in both cases this component changes nothing.
 	 */
 	public record LocalSpace(boolean position, boolean rotation, boolean velocity) {
 
@@ -191,12 +191,12 @@ public record KashiParticleDefinition(
 	}
 
 	/**
-	 * One entry of {@code particle_effect.curves} â€” Snowstorm's "Variables &amp; Curves" tab.
+	 * One entry of {@code particle_effect.curves} — Snowstorm's "Variables &amp; Curves" tab.
 	 *
 	 * <p>A curve is an assignment, not a shape: it computes a value from {@link #input} and stores
 	 * it in {@link #variable}, which the rest of the effect then reads like any other
 	 * {@code variable.*}. Effects here routinely drive their size that way, so an unevaluated
-	 * curve does not degrade an effect â€” it makes it invisible.
+	 * curve does not degrade an effect — it makes it invisible.
 	 *
 	 * <p>Exactly one of {@link #nodes} and {@link #chain} is non-null, according to {@link #type}.
 	 */
@@ -204,7 +204,7 @@ public record KashiParticleDefinition(
 			MolangExpr horizontalRange, double[] nodes, CurveSampler.ChainKey[] chain) {}
 
 	/**
-	 * {@code minecraft:emitter_initialization} â€” where an effect sets up its own MoLang variables.
+	 * {@code minecraft:emitter_initialization} — where an effect sets up its own MoLang variables.
 	 *
 	 * <p>{@link #creation} runs once when the emitter starts, {@link #perUpdate} every emitter tick.
 	 * Both are usually assignments ({@code variable.x = ...}); whatever they define is readable by
@@ -213,7 +213,7 @@ public record KashiParticleDefinition(
 	public record EmitterInitialization(MolangExpr creation, MolangExpr perUpdate) {}
 
 	/**
-	 * {@code minecraft:particle_initialization} â€” per-particle MoLang setup.
+	 * {@code minecraft:particle_initialization} — per-particle MoLang setup.
 	 *
 	 * <p>{@link #perUpdate} runs on every particle tick, {@link #perRender} on every frame before
 	 * the particle is drawn.
@@ -246,7 +246,7 @@ public record KashiParticleDefinition(
 	 * <p>{@code CUTOUT} is Bedrock's {@code particles_alpha}: a hard alpha <em>test</em>, where a
 	 * pixel is either drawn at full strength or not at all. It is a different thing from
 	 * {@code ALPHA} ({@code particles_blend}), which fades smoothly, and an effect authored for one
-	 * looks wrong under the other â€” soft edges where the author wanted crisp ones.
+	 * looks wrong under the other — soft edges where the author wanted crisp ones.
 	 */
 	public enum BlendMode { ALPHA, CUTOUT, ADD, OPAQUE }
 
@@ -314,8 +314,8 @@ public record KashiParticleDefinition(
 	 *
 	 * <p>The distinction is not cosmetic. A bare number is a <b>speed</b> along whatever direction
 	 * the emitter shape chose; a three-element array is an outright <b>velocity</b> that ignores
-	 * that direction. Collapsing them loses the difference silently â€” the particle still moves, just
-	 * not where the effect said â€” so the two are kept apart here and the runtime asks which it has.
+	 * that direction. Collapsing them loses the difference silently — the particle still moves, just
+	 * not where the effect said — so the two are kept apart here and the runtime asks which it has.
 	 */
 	public sealed interface InitialSpeed {
 		record AlongDirection(MolangExpr speed) implements InitialSpeed {}
@@ -327,7 +327,7 @@ public record KashiParticleDefinition(
 			MolangExpr rotationAcceleration, MolangExpr rotationDrag) {}
 
 	/**
-	 * {@code minecraft:particle_motion_parametric} â€” position driven by expression instead of physics.
+	 * {@code minecraft:particle_motion_parametric} — position driven by expression instead of physics.
 	 *
 	 * <p>Where dynamic motion integrates acceleration and drag, parametric motion simply states
 	 * where the particle is, relative to its emitter, at any moment. When present it replaces the
@@ -340,10 +340,10 @@ public record KashiParticleDefinition(
 	 * differently, so mixing them up is what makes an effect look wrong or vanish:
 	 *
 	 * <ul>
-	 * <li><b>rotate_* / lookat_*</b> â€” camera-facing billboards. Always visible.</li>
-	 * <li><b>direction_* / lookat_direction</b> â€” oriented by the particle's own direction of
+	 * <li><b>rotate_* / lookat_*</b> — camera-facing billboards. Always visible.</li>
+	 * <li><b>direction_* / lookat_direction</b> — oriented by the particle's own direction of
 	 *     travel. A slash aligns with where it flies.</li>
-	 * <li><b>emitter_transform_*</b> â€” a fixed plane pinned to the emitter's axes. Can be seen
+	 * <li><b>emitter_transform_*</b> — a fixed plane pinned to the emitter's axes. Can be seen
 	 *     edge-on and disappear; that is authored behaviour, not a fault.</li>
 	 * </ul>
 	 */
@@ -357,12 +357,12 @@ public record KashiParticleDefinition(
 	 * Flipbook animation over the texture sheet.
 	 *
 	 * <p>All UV values are in texture pixels, to be divided by the {@link Uv} sheet dimensions
-	 * at render time â€” Bedrock authors them in pixels, not normalised coordinates.
+	 * at render time — Bedrock authors them in pixels, not normalised coordinates.
 	 */
 	public record Flipbook(Vec2Expr baseUv, Vec2Expr sizeUv, Vec2Expr stepUv, MolangExpr fps,
 			double maxFrame, boolean stretchToLifetime, boolean loop) {}
 
-	/** {@code particle_appearance_billboard.uv} â€” either a static rect or a {@link Flipbook}. */
+	/** {@code particle_appearance_billboard.uv} — either a static rect or a {@link Flipbook}. */
 	public record Uv(double textureWidth, double textureHeight, Vec2Expr uv, Vec2Expr uvSize,
 			Flipbook flipbook) {
 
@@ -380,7 +380,7 @@ public record KashiParticleDefinition(
 	/**
 	 * {@code minecraft:particle_appearance_tinting}.
 	 *
-	 * <p>Either a gradient sampled by {@link #interpolant}, or a flat {@link #color} â€” exactly
+	 * <p>Either a gradient sampled by {@link #interpolant}, or a flat {@link #color} — exactly
 	 * one of the two is non-null.
 	 */
 	public record Tinting(MolangExpr interpolant, List<GradientStop> gradient, ColorExpr color) {}
@@ -411,8 +411,8 @@ public record KashiParticleDefinition(
 			// the .json extension and nothing else.
 			throw new KashiParticleParseException("", root.has("textures")
 					? "this looks like a vanilla Java particle description, not a Bedrock "
-							+ "particle effect â€” expected a '" + EFFECT_KEY + "' object"
-					: "missing '" + EFFECT_KEY + "' â€” not a Bedrock particle effect");
+							+ "particle effect — expected a '" + EFFECT_KEY + "' object"
+					: "missing '" + EFFECT_KEY + "' — not a Bedrock particle effect");
 		}
 
 		if (!root.has(FORMAT_KEY))
@@ -466,8 +466,8 @@ public record KashiParticleDefinition(
 	/**
 	 * Reads one event node.
 	 *
-	 * <p>A node object may carry several kinds at once â€” Bedrock treats {@code sound_effect} beside
-	 * {@code particle_effect} as "do both" â€” so anything with more than one becomes a sequence
+	 * <p>A node object may carry several kinds at once — Bedrock treats {@code sound_effect} beside
+	 * {@code particle_effect} as "do both" — so anything with more than one becomes a sequence
 	 * rather than the first one winning.
 	 */
 	private static EventNode eventNode(JsonObject owner, String path) {
@@ -619,7 +619,7 @@ public record KashiParticleDefinition(
 
 	/**
 	 * Reads {@code particle_effect.curves}, which sits beside {@code components} rather than
-	 * inside it â€” a curve is not a component and would never reach the component loop.
+	 * inside it — a curve is not a component and would never reach the component loop.
 	 */
 	private static List<Curve> curves(JsonObject owner) {
 		if (owner == null)
@@ -956,19 +956,19 @@ public record KashiParticleDefinition(
 						"Bedrock sound events have no Java equivalent - this will stay silent", true));
 			}
 
-			// A particle with no shape or no lifetime would spawn nothing, or spawn immortals â€”
+			// A particle with no shape or no lifetime would spawn nothing, or spawn immortals —
 			// both are almost certainly a truncated export rather than an intentional effect.
 			if (this.shape == null)
 				throw new KashiParticleParseException(EFFECT_KEY + ".components",
-						"no 'minecraft:emitter_shape_*' component â€” the emitter has no shape to spawn from");
+						"no 'minecraft:emitter_shape_*' component — the emitter has no shape to spawn from");
 
 			if (this.particleLifetime == null)
 				throw new KashiParticleParseException(EFFECT_KEY + ".components",
-						"no 'minecraft:particle_lifetime_expression' component â€” particles would never expire");
+						"no 'minecraft:particle_lifetime_expression' component — particles would never expire");
 
 			if (this.appearance == null)
 				throw new KashiParticleParseException(EFFECT_KEY + ".components",
-						"no 'minecraft:particle_appearance_billboard' component â€” particles would be invisible");
+						"no 'minecraft:particle_appearance_billboard' component — particles would be invisible");
 
 			// Rate and emitter lifetime do have sane Bedrock defaults, so fill them in rather
 			// than refusing the import.
@@ -1201,7 +1201,7 @@ public record KashiParticleDefinition(
 	private static GradientStop stop(double position, JsonElement value, String path) {
 		ColorExpr color = colorExpr(value, path);
 
-		// Gradient stops must be literal colours â€” they are sampled, not evaluated per-particle.
+		// Gradient stops must be literal colours — they are sampled, not evaluated per-particle.
 		if (!color.r().isConstant() || !color.g().isConstant() || !color.b().isConstant()
 				|| !color.a().isConstant())
 			throw new KashiParticleParseException(path, "gradient stops must be literal colours, "
@@ -1215,12 +1215,12 @@ public record KashiParticleDefinition(
 	/**
 	 * Reads a colour given either as a hex string or as an array of up to four MoLang channels.
 	 *
-	 * <p>Hex is {@code #RRGGBB} or {@code #AARRGGBB} â€” <b>alpha first</b>, the Snowstorm/Bedrock
+	 * <p>Hex is {@code #RRGGBB} or {@code #AARRGGBB} — <b>alpha first</b>, the Snowstorm/Bedrock
 	 * convention. This was verified against the reference effect: its gradient
 	 * {@code "#FF00FF72"} renders green in Snowstorm, which only the alpha-first reading
 	 * ({@code A=FF, R=00, G=FF, B=72}) produces; read alpha-last it would be magenta. The
 	 * trailing {@code 72} in a stop like {@code "#0000FF72"} is therefore an alpha of ~0, i.e. the
-	 * particle fades out at end of life â€” intended, not a mistake.
+	 * particle fades out at end of life — intended, not a mistake.
 	 */
 	private static ColorExpr colorExpr(JsonElement element, String path) {
 		if (element.isJsonArray()) {
@@ -1230,7 +1230,7 @@ public record KashiParticleDefinition(
 				throw new KashiParticleParseException(path,
 						"a colour array needs at least [r, g, b], found " + array.size() + " entries");
 
-			// Array form stays [r, g, b, a] â€” only the hex string is alpha-first.
+			// Array form stays [r, g, b, a] — only the hex string is alpha-first.
 			return new ColorExpr(MolangExpr.from(array.get(0), path + "[0]"),
 					MolangExpr.from(array.get(1), path + "[1]"),
 					MolangExpr.from(array.get(2), path + "[2]"),

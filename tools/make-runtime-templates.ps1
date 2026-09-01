@@ -44,7 +44,7 @@ foreach ($root in $sourceRoots) {
 
         New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
 
-        $code = Get-Content $file.FullName -Raw
+        $code = Get-Content $file.FullName -Raw -Encoding UTF8
 
         # Freemarker would eat any of these as its own syntax rather than passing them through as
         # literal Java text: ${...} interpolation, <#...> directives, and #{...} - FreeMarker's
