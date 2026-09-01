@@ -5,6 +5,9 @@
 	readable Java method instead of branching freemarker - and so the same rules apply wherever the
 	API is called from.
 
+	scale/duration are additive offsets on top of what the effect authored, both defaulting to 0 -
+	see world_spawn_kashi_particle.java.ftl for what they do.
+
 	The effect id is field$effect (e.g. "CUSTOM:ThunderTrail") with the prefix stripped and put
 	through the SAME transform MCreator's own registryName generation uses, reproduced here because
 	nothing in the template API exposes it directly. Two things this is deliberately NOT, both
@@ -30,4 +33,5 @@ if (world instanceof net.minecraft.world.level.Level _kashiLevel${cbi})
 		net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
 			net.kashi.particles.runtime.KashiParticlesRuntime.MODID,
 			"${field$effect?replace("CUSTOM:", "")?replace("(.)([A-Z][a-z]+)", "$1_$2", "r")?replace("([a-z0-9])([A-Z])", "$1_$2", "r")?lower_case}"),
-		${input$entity}, ${input$right}, ${input$up}, ${input$forward}, "${field$aim}");
+		${input$entity}, ${input$right}, ${input$up}, ${input$forward}, "${field$aim}",
+		(float) (${input$scale}), (float) (${input$duration}));

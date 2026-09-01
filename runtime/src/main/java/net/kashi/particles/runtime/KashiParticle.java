@@ -80,6 +80,9 @@ public class KashiParticle extends Particle {
 	/** Set by parametric motion; overrides the spin from particle_initial_spin when in use. */
 	private float parametricRotationDeg;
 
+	/** Additive size offset from the spawn that fired this effect; 0 leaves the authored size alone. */
+	private final float scaleOffset;
+
 	/**
 	 * @param spawnContext the context the emitter already used to place this particle - its four
 	 *                     randoms are rolled there and must be reused here, or a random that
@@ -88,12 +91,13 @@ public class KashiParticle extends Particle {
 	 */
 	KashiParticle(ClientLevel level, double x, double y, double z, KashiEmitterParticle emitter,
 			KashiCompiledEffect effect, MolangContext spawnContext,
-			double dirX, double dirY, double dirZ) {
+			double dirX, double dirY, double dirZ, float scaleOffset) {
 		super(level, x, y, z);
 
 		this.effect = effect;
 		this.emitter = emitter;
 		this.context = spawnContext;
+		this.scaleOffset = scaleOffset;
 
 		KashiParticleDefinition d = effect.definition();
 
@@ -479,8 +483,11 @@ public class KashiParticle extends Particle {
 		if (init != null)
 			this.effect.compile(init.perRender()).eval(this.context);
 
-		float halfW = (float) this.sizeX.eval(this.context);
-		float halfH = (float) this.sizeY.eval(this.context);
+		// scaleOffset is additive, not multiplicative (the user's call - "somar e subtrair, não
+		// multiplicar"), floored at 0 so a large negative offset shrinks the particle away instead
+		// of flipping its sign and mirroring the quad. 0 is the default and leaves size untouched.
+		float halfW = Math.max(0, (float) this.sizeX.eval(this.context) + this.scaleOffset);
+		float halfH = Math.max(0, (float) this.sizeY.eval(this.context) + this.scaleOffset);
 
 		float[] rgba = tint(ageSeconds);
 		float[] uv = uv(ageSeconds);
@@ -729,8 +736,11 @@ public class KashiParticle extends Particle {
 	 */
 	@Override
 	public net.minecraft.world.phys.AABB getRenderBoundingBox(float partialTick) {
-		double halfW = this.sizeX.eval(this.context);
-		double halfH = this.sizeY.eval(this.context);
+		// Matches render()'s own floor, so a scaleOffset large enough to grow the quad still gets a
+		// culling box that actually covers it, and a shrink-to-0 does not leave a box sized for a
+		// particle that is not drawn at that size any more.
+		double halfW = Math.max(0, this.sizeX.eval(this.context) + this.scaleOffset);
+		double halfH = Math.max(0, this.sizeY.eval(this.context) + this.scaleOffset);
 		double reach = Math.sqrt(halfW * halfW + halfH * halfH);
 
 		return new net.minecraft.world.phys.AABB(

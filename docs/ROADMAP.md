@@ -8,8 +8,52 @@ abaixo.
 
 ## Próximas fases
 
-### Fase 3 — Melhorias e correções
-A definir com o usuário quando começar.
+### Fase 3 — Melhorias e correções (concluída)
+4 melhorias no wizard e nos procedures: bloqueio de salvar um elemento sem `.particle.json`
+importado; mensagem correta no seletor de efeito (`dialog.selector.kashiparticle.message`); spawn
+a partir de entidade ancorado nos pés em vez dos olhos; direção opcional adicionada aos blocos de
+spawn no mundo e a partir de bloco (antes só o bloco de entidade tinha aim). Também nesta janela:
+correção da caixa de frustum culling (diagonal em vez de `max`), correção do sinal de roll em
+`lookat_direction`/`direction_x/y/z`, rotação de `linear_acceleration` pela mira, eliminação de
+alocação por frame no render, e um reforço visual completo do wizard de importação (resumo mais
+rico, diagnósticos fixos na tela, arrastar-e-soltar).
+
+### V2 — escala/duração aditivos e correção do broadcast (concluída)
+A partir de uma lista de ideias do usuário (`Spawn`/`Play`/`Stop`/`Attach`/`Set Variable`
+organizados em torno de um conceito de "Particle Instance"), o que foi validado e implementado:
+
+- **Escala e duração aditivas** nos 3 blocos de spawn (`scale`, `duration`, ambos default `0` = sem
+  mudança, Snowstorm continua a fonte da verdade). `duration` afeta só o `active_time` do emissor
+  (quanto tempo ele continua nascendo partículas novas), não o `max_lifetime` de cada partícula.
+- **Correção do envio de partícula**: o broadcast do servidor para múltiplos clientes usava
+  `level.addParticle`, que tem corpo vazio em `ServerLevel` — um no-op mascarado por singleplayer
+  (nunca testado em multiplayer real nesta sessão). Trocado por `ServerLevel.sendParticles(...,
+  longDistance = true, ...)`, que também amplia o raio de transmissão de 32 para 512 blocos.
+
+Descartado ou adiado desta lista, com o motivo:
+
+- **Direção/aim configurável no spawn** — descartado pelo usuário, sem necessidade identificada.
+- **Distância máxima configurável** — descartada: o pedido real era garantia de visibilidade a
+  longa distância, resolvido pela correção do broadcast acima; nenhum teto novo era necessário.
+- **Set K4SH1 Particle Variable** — descartado pelo usuário ("não estou achando muito útil").
+- **Stop K4SH1 Particle** e **Attach K4SH1 Particle to entity** — ver "Ideias futuras" abaixo.
+
+### Ideias futuras (validadas, não implementadas)
+
+- **Stop K4SH1 Particle** — parar uma instância em execução (ex.: uma aura). Precisa de um sistema
+  de ID de instância e de um pacote de rede próprio do plugin — hoje todo spawn pega carona no
+  pacote nativo de partícula do Minecraft, que não tem conceito de "parar depois". É o maior dos
+  dois em esforço.
+- **Attach K4SH1 Particle to entity** — prender um efeito a uma entidade em vez de a uma posição
+  fixa, para que ele a acompanhe (aura, energia na mão, fogo nos pés). Escopo inicial acordado:
+  **vanilla apenas, sem GeckoLib** — Player e entidades biped vanilla (zumbis, esqueletos) e o
+  modelo biped padrão do MCreator. Pontos de ancoragem: raiz/corpo, cabeça, **olho**, braço/mão,
+  perna/pé. Raiz/corpo/cabeça/olho é esforço baixo (a mesma máquina de `emitter_local_space` já
+  existente, só ancorando num offset da entidade em vez de world-space). Braço/mão e perna/pé é
+  esforço moderado (aproximar a pose de `HumanoidModel` via `entity.getAttackAnim(partialTick)` /
+  `entity.walkAnimation`, API pública e estável do próprio Minecraft — sem precisar de GeckoLib
+  nem mexer em internals de render). Suporte a GeckoLib, Player Animator e entidades não-biped
+  fica para avaliação futura separada, possivelmente descartado.
 
 ### Fase 4 — Porte para MCreator 2026.2
 Novos geradores: NeoForge 1.21.8, 26.1 e 26.2. Hoje o plugin implementa só o gerador

@@ -39,6 +39,16 @@ effect, a fixed hazard. A non-zero direction turns the whole effect to face that
 idea as **aim** on the entity block below, just given directly since there's no entity to read a
 look direction from.
 
+`scale` / `duration` both default to `0`, meaning no change — whatever was authored in Snowstorm
+stays the source of truth. They're **additive**, not multiplicative:
+
+- `scale` is added to every particle's authored half-width/half-height (floored at 0, so a large
+  negative value shrinks the effect away rather than flipping it). A positive value grows the
+  effect, a negative value shrinks it.
+- `duration` is added to the emitter's `active_time` — how long it keeps spawning *new* particles
+  — not to any individual particle's own lifetime. A positive value keeps the emitter creating
+  particles for longer; existing particles still live out their own authored lifetime either way.
+
 ### Spawn KASHI Particle from entity
 
 Fires from the entity's **feet**, offset in the entity's **own** frame:
@@ -61,16 +71,22 @@ and velocity turn with the entity (yaw only, for the reason above), `velocity` m
 the entity's own motion (a trail effect that keeps moving with whoever cast it, instead of
 snapping to a stop the instant it's created).
 
+Same `scale` / `duration` additive offsets as the world-position block above, both defaulting to
+`0` (no change).
+
 ### Spawn KASHI Particle from block
 
 Fires at the centre of a block. Same `direction x/y/z` as the world-position block above — zero
-keeps the authored world orientation, non-zero turns the effect to face that way.
+keeps the authored world orientation, non-zero turns the effect to face that way. Same `scale` /
+`duration` additive offsets too, both defaulting to `0` (no change).
 
 ## Performance: firing many effects at once
 
 Each KASHI effect fires as its own emitter, always created regardless of distance from the
 player (so an effect fired far away still plays — it just isn't drawn until the player is close
-enough to see it, same as any particle). That has no real cost.
+enough to see it, same as any particle). That has no real cost. On a multiplayer server the spawn
+is broadcast to every player within 512 blocks, so an effect that's genuinely in view stays
+visible even fired from far away.
 
 What does cost something is firing a lot of *heavy* effects in the very same tick — a crowd of
 entities all playing a hit effect simultaneously, or an AOE that fires from every target at once.

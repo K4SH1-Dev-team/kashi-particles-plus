@@ -70,6 +70,9 @@ public class KashiEmitterParticle extends Particle {
 	private final double sleepSeconds;
 	private final int maxParticles;
 
+	/** Additive size offset, threaded through to every particle this emitter spawns. */
+	private final float scaleOffset;
+
 	private double spawnAccumulator;
 
 	/** The last emitting cycle an instant rate fired in, so each cycle bursts exactly once. */
@@ -94,14 +97,35 @@ public class KashiEmitterParticle extends Particle {
 
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor) {
-		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0);
+		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, 0, 0);
 	}
 
 	/** @param eventDepth how many chained events deep this emitter already is; 0 when fired directly */
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor,
 			int eventDepth) {
+		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, eventDepth, 0, 0);
+	}
+
+	/**
+	 * As the no-offset constructor, with additive scale/duration offsets from the spawn that fired
+	 * this effect directly (an event-chained child always gets {@code 0, 0} â€” see the other
+	 * constructor - a hit-effect triggered by a parent effect is its own authored effect, not a
+	 * continuation of whatever offset the parent's spawn happened to carry).
+	 */
+	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
+			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor,
+			float scaleOffset, float durationOffset) {
+		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, scaleOffset, durationOffset);
+	}
+
+	/** @param eventDepth how many chained events deep this emitter already is; 0 when fired directly */
+	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
+			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor,
+			int eventDepth, float scaleOffset, float durationOffset) {
 		super(level, x, y, z);
+
+		this.scaleOffset = scaleOffset;
 
 		this.eventDepth = eventDepth;
 
@@ -133,7 +157,9 @@ public class KashiEmitterParticle extends Particle {
 		if (d.emitterInit() != null)
 			this.effect.compile(d.emitterInit().creation()).eval(this.context);
 
-		this.activeSeconds = emitterActiveTime(d.lifetime());
+		// durationOffset is additive on active_time only - how long the emitter keeps spawning new
+		// particles - never on an individual particle's own max_lifetime, per the spawn's contract.
+		this.activeSeconds = Math.max(0, emitterActiveTime(d.lifetime()) + durationOffset);
 		this.sleepSeconds = emitterSleepTime(d.lifetime());
 		this.context.set(Var.EMITTER_LIFETIME, this.activeSeconds);
 		// Again now that the emitter's own lifetime is known: a curve is free to use it as its
@@ -499,7 +525,7 @@ public class KashiEmitterParticle extends Particle {
 		Vector3f dir = spawnDirection(spawnContext, radial);
 
 		KashiParticle particle = new KashiParticle((ClientLevel) this.level, px, py, pz, this,
-				this.effect, spawnContext, dir.x(), dir.y(), dir.z());
+				this.effect, spawnContext, dir.x(), dir.y(), dir.z(), this.scaleOffset);
 
 		Minecraft.getInstance().particleEngine.add(particle);
 	}

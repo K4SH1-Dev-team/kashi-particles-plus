@@ -8,6 +8,11 @@
 	aim mode; see KashiParticleAPI.spawnKashiParticle for how it is consumed (same aimQuaternion
 	machinery as the entity block's "aim").
 
+	scale/duration are additive offsets on top of what the effect authored, both defaulting to 0
+	(no change - Snowstorm stays the source of truth when nothing is filled in). duration is
+	specifically active_time - how long the emitter keeps spawning new particles - not any single
+	particle's own lifetime.
+
 	Fully-qualified names throughout, because a procedure's generated file has no imports of ours.
 
 	The effect id reproduces MCreator's own registryName transform - see
@@ -19,4 +24,5 @@ if (world instanceof net.minecraft.world.level.Level _kashiLevel${cbi})
 		net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
 			net.kashi.particles.runtime.KashiParticlesRuntime.MODID,
 			"${field$effect?replace("CUSTOM:", "")?replace("(.)([A-Z][a-z]+)", "$1_$2", "r")?replace("([a-z0-9])([A-Z])", "$1_$2", "r")?lower_case}"),
-		${input$x}, ${input$y}, ${input$z}, ${input$dirx}, ${input$diry}, ${input$dirz});
+		${input$x}, ${input$y}, ${input$z}, ${input$dirx}, ${input$diry}, ${input$dirz},
+		(float) (${input$scale}), (float) (${input$duration}));
