@@ -57,6 +57,23 @@ public class KashiParticle extends Particle {
 	private int timelineFired;
 	private boolean expirationFired;
 
+	// Scratch objects reused across render() calls so the hot per-frame path allocates nothing.
+	// A single effect routinely has thousands of live particles, each rendered every frame (not
+	// just every tick) - `new`ing half a dozen small JOML objects and float[4]s per particle per
+	// frame is real, measurable garbage-collector pressure, and GC pauses are the classic cause of
+	// periodic stutter. Each field is written before every read within one render() call, so
+	// reusing them across frames is safe - nothing outside this instance ever holds onto a
+	// reference to them.
+	private final Quaternionf facingScratch = new Quaternionf();
+	private final Vector3f travelScratch = new Vector3f();
+	private final Vector3f axisScratch = new Vector3f();
+	private final Vector3f normalScratch = new Vector3f();
+	private final Vector3f forwardScratch = new Vector3f();
+	private final Vector3f crossScratch = new Vector3f();
+	private final Vector3f vertexScratch = new Vector3f();
+	private final float[] uvScratch = new float[4];
+	private final float[] tintScratch = new float[4];
+
 	/** Guards against telling the emitter twice that this particle died. */
 	private boolean releasedSlot;
 
@@ -497,9 +514,9 @@ public class KashiParticle extends Particle {
 
 	private void vertex(VertexConsumer buffer, Quaternionf facing, float cx, float cy, float cz,
 			float ox, float oy, float u, float v, float[] rgba, int light) {
-		Vector3f corner = new Vector3f(ox, oy, 0).rotate(facing).add(cx, cy, cz);
+		this.vertexScratch.set(ox, oy, 0).rotate(facing).add(cx, cy, cz);
 
-		buffer.addVertex(corner.x(), corner.y(), corner.z())
+		buffer.addVertex(this.vertexScratch.x(), this.vertexScratch.y(), this.vertexScratch.z())
 				.setUv(u, v)
 				.setColor(rgba[0], rgba[1], rgba[2], rgba[3])
 				.setLight(light);
@@ -518,21 +535,28 @@ public class KashiParticle extends Particle {
 
 		return switch (this.effect.definition().appearance().facing()) {
 			// Upright billboards: turn to the camera around Y only, so they never tip over.
-			case LOOKAT_Y, ROTATE_Y -> new Quaternionf(0, rotation.y, 0, rotation.w);
+			case LOOKAT_Y, ROTATE_Y -> this.facingScratch.set(0, rotation.y, 0, rotation.w);
 
 			// Aligned to where the particle is travelling, still turned towards the viewer. This is
 			// what makes a slash lie along its own path instead of always squarely facing you.
 			case LOOKAT_DIRECTION, DIRECTION_X, DIRECTION_Y, DIRECTION_Z -> directionFacing(rotation);
 
 			// Fixed planes on the emitter's axes - these can be edge-on and vanish, by design.
-			case EMITTER_TRANSFORM_XY -> this.emitter.aimRotation();
-			case EMITTER_TRANSFORM_XZ -> this.emitter.aimRotation()
-					.rotateX((float) Math.toRadians(-90));
-			case EMITTER_TRANSFORM_YZ -> this.emitter.aimRotation()
-					.rotateY((float) Math.toRadians(90));
+			case EMITTER_TRANSFORM_XY -> {
+				this.emitter.aimRotationInto(this.facingScratch);
+				yield this.facingScratch;
+			}
+			case EMITTER_TRANSFORM_XZ -> {
+				this.emitter.aimRotationInto(this.facingScratch);
+				yield this.facingScratch.rotateX((float) Math.toRadians(-90));
+			}
+			case EMITTER_TRANSFORM_YZ -> {
+				this.emitter.aimRotationInto(this.facingScratch);
+				yield this.facingScratch.rotateY((float) Math.toRadians(90));
+			}
 
 			// ROTATE_XYZ and LOOKAT_XYZ: full camera-facing billboard.
-			default -> new Quaternionf(rotation);
+			default -> this.facingScratch.set(rotation);
 		};
 	}
 
@@ -560,23 +584,25 @@ public class KashiParticle extends Particle {
 	 * all four (wrong everywhere); {@code roll + Ï€} gives â‰ˆ -1.0 for all four (correct everywhere).
 	 */
 	private Quaternionf directionFacing(Quaternionf cameraRotation) {
-		Vector3f travel = new Vector3f((float) this.vx, (float) this.vy, (float) this.vz);
+		this.travelScratch.set((float) this.vx, (float) this.vy, (float) this.vz);
 
-		if (travel.lengthSquared() < 1.0e-6f)
-			return new Quaternionf(cameraRotation);
+		if (this.travelScratch.lengthSquared() < 1.0e-6f)
+			return this.facingScratch.set(cameraRotation);
 
-		travel.normalize();
+		this.travelScratch.normalize();
 
 		// The quad is built in local XY, so map its local +X onto the direction of travel; the
 		// remaining freedom is spun towards the camera so the face stays readable.
-		Quaternionf alignment = new Quaternionf().rotateTo(new Vector3f(1, 0, 0), travel);
-		Vector3f quadNormal = new Vector3f(0, 0, 1).rotate(alignment);
-		Vector3f cameraForward = new Vector3f(0, 0, -1).rotate(new Quaternionf(cameraRotation));
+		this.axisScratch.set(1, 0, 0);
+		this.facingScratch.identity().rotateTo(this.axisScratch, this.travelScratch);
+		this.normalScratch.set(0, 0, 1).rotate(this.facingScratch);
+		this.forwardScratch.set(0, 0, -1).rotate(cameraRotation);
+		this.crossScratch.set(this.travelScratch).cross(this.normalScratch);
 
 		float roll = (float) Math.atan2(
-				new Vector3f(travel).cross(quadNormal).dot(cameraForward), quadNormal.dot(cameraForward));
+				this.crossScratch.dot(this.forwardScratch), this.normalScratch.dot(this.forwardScratch));
 
-		return alignment.rotateX(roll + (float) Math.PI);
+		return this.facingScratch.rotateX(roll + (float) Math.PI);
 	}
 
 	/** Returns {u0, v0, u1, v1} normalised texture coordinates for the current frame. */
@@ -610,21 +636,23 @@ public class KashiParticle extends Particle {
 		double sizeU = this.effect.compile(fb.sizeUv().x()).eval(this.context);
 		double sizeV = this.effect.compile(fb.sizeUv().y()).eval(this.context);
 
-		float u0 = (float) ((baseU + stepU * frame) / texW);
-		float v0 = (float) ((baseV + stepV * frame) / texH);
-		float u1 = (float) (u0 + sizeU / texW);
-		float v1 = (float) (v0 + sizeV / texH);
+		this.uvScratch[0] = (float) ((baseU + stepU * frame) / texW);
+		this.uvScratch[1] = (float) ((baseV + stepV * frame) / texH);
+		this.uvScratch[2] = (float) (this.uvScratch[0] + sizeU / texW);
+		this.uvScratch[3] = (float) (this.uvScratch[1] + sizeV / texH);
 
-		return new float[] { u0, v0, u1, v1 };
+		return this.uvScratch;
 	}
 
 	private float[] staticUv(Uv sheet, double texW, double texH) {
-		float u0 = (float) (this.effect.compile(sheet.uv().x()).eval(this.context) / texW);
-		float v0 = (float) (this.effect.compile(sheet.uv().y()).eval(this.context) / texH);
-		float u1 = (float) (u0 + this.effect.compile(sheet.uvSize().x()).eval(this.context) / texW);
-		float v1 = (float) (v0 + this.effect.compile(sheet.uvSize().y()).eval(this.context) / texH);
+		this.uvScratch[0] = (float) (this.effect.compile(sheet.uv().x()).eval(this.context) / texW);
+		this.uvScratch[1] = (float) (this.effect.compile(sheet.uv().y()).eval(this.context) / texH);
+		this.uvScratch[2] = (float) (this.uvScratch[0]
+				+ this.effect.compile(sheet.uvSize().x()).eval(this.context) / texW);
+		this.uvScratch[3] = (float) (this.uvScratch[1]
+				+ this.effect.compile(sheet.uvSize().y()).eval(this.context) / texH);
 
-		return new float[] { u0, v0, u1, v1 };
+		return this.uvScratch;
 	}
 
 	/** Samples the tint gradient at the interpolant, returning premultiplied-free RGBA in 0..1. */
@@ -632,14 +660,14 @@ public class KashiParticle extends Particle {
 		KashiParticleDefinition.Tinting tinting = this.effect.definition().tinting();
 
 		if (tinting == null)
-			return new float[] { 1, 1, 1, 1 };
+			return setTintScratch(1, 1, 1, 1);
 
 		if (tinting.color() != null) {
-			return new float[] {
+			return setTintScratch(
 					(float) this.effect.compile(tinting.color().r()).eval(this.context),
 					(float) this.effect.compile(tinting.color().g()).eval(this.context),
 					(float) this.effect.compile(tinting.color().b()).eval(this.context),
-					(float) this.effect.compile(tinting.color().a()).eval(this.context) };
+					(float) this.effect.compile(tinting.color().a()).eval(this.context));
 		}
 
 		double interpolant = this.tintInterpolant != null ? this.tintInterpolant.eval(this.context) : 0;
@@ -647,13 +675,13 @@ public class KashiParticle extends Particle {
 		return sampleGradient(tinting.gradient(), (float) interpolant);
 	}
 
-	private static float[] sampleGradient(List<GradientStop> stops, float position) {
+	private float[] sampleGradient(List<GradientStop> stops, float position) {
 		if (stops.isEmpty())
-			return new float[] { 1, 1, 1, 1 };
+			return setTintScratch(1, 1, 1, 1);
 
 		GradientStop first = stops.get(0);
 		if (position <= first.position())
-			return new float[] { first.r(), first.g(), first.b(), first.a() };
+			return setTintScratch(first.r(), first.g(), first.b(), first.a());
 
 		for (int i = 1; i < stops.size(); i++) {
 			GradientStop hi = stops.get(i);
@@ -663,16 +691,25 @@ public class KashiParticle extends Particle {
 				float span = (float) (hi.position() - lo.position());
 				float f = span <= 0 ? 0 : (float) ((position - lo.position()) / span);
 
-				return new float[] {
+				return setTintScratch(
 						Mth.lerp(f, lo.r(), hi.r()),
 						Mth.lerp(f, lo.g(), hi.g()),
 						Mth.lerp(f, lo.b(), hi.b()),
-						Mth.lerp(f, lo.a(), hi.a()) };
+						Mth.lerp(f, lo.a(), hi.a()));
 			}
 		}
 
 		GradientStop last = stops.get(stops.size() - 1);
-		return new float[] { last.r(), last.g(), last.b(), last.a() };
+		return setTintScratch(last.r(), last.g(), last.b(), last.a());
+	}
+
+	private float[] setTintScratch(float r, float g, float b, float a) {
+		this.tintScratch[0] = r;
+		this.tintScratch[1] = g;
+		this.tintScratch[2] = b;
+		this.tintScratch[3] = a;
+
+		return this.tintScratch;
 	}
 
 	/**

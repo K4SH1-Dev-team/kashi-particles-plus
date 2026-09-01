@@ -355,9 +355,15 @@ public class KashiEmitterParticle extends Particle {
 		local.rotate(this.aim);
 	}
 
-	/** A fresh copy of the aim rotation, for the emitter_transform_* billboard modes. */
-	Quaternionf aimRotation() {
-		return new Quaternionf(this.aim);
+	/**
+	 * Writes the aim rotation into {@code dest}, for the emitter_transform_* billboard modes.
+	 *
+	 * <p>Takes a destination instead of returning a fresh copy: the caller renders every frame for
+	 * every particle under this emitter, so allocating here would be one more small object per
+	 * particle per frame - the caller passes its own reusable scratch quaternion instead.
+	 */
+	void aimRotationInto(Quaternionf dest) {
+		dest.set(this.aim);
 	}
 
 	@Override
