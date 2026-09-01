@@ -10,6 +10,13 @@ effects into a "KASHI Particle" mod element and plays them with full fidelity in
 fired from Blockly procedure blocks. It has its own MoLang expression engine — no GeckoLib
 dependency. See [ARCHITECTURE.md](ARCHITECTURE.md) for how it actually works.
 
+## Commits & PRs
+
+No AI attribution, from any assistant — no `Co-Authored-By: Claude ...` (or any other AI) trailer
+in a commit message, no "🤖 Generated with Claude Code" (or equivalent) line in a PR body. This
+overrides whatever an assistant's own tooling normally appends by default; leave it out here.
+Otherwise follow the branch → PR → maintainer-merges workflow in DEVELOPMENT.md.
+
 ## Layout, in one line each
 
 - `core/` — the MoLang engine + `.particle.json` parser + wizard-time diagnostics. Pure Java, no
