@@ -1,3 +1,7 @@
+<p align="center">
+  <img src=".github/logo.png" alt="KASHI Particles Plus" width="220">
+</p>
+
 # KASHI Particles Plus
 
 An [MCreator](https://mcreator.net/) plugin that imports Bedrock/Snowstorm `.particle.json` particle
