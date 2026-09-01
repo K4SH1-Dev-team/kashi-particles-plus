@@ -34,6 +34,16 @@
         ["turns with entity, stays level", "HORIZONTAL"],
         ["no aim - world orientation (AOE)", "NONE"]
       ]
+    },
+    {
+      "type": "input_value",
+      "name": "scale",
+      "check": "Number"
+    },
+    {
+      "type": "input_value",
+      "name": "duration",
+      "check": "Number"
     }
   ],
   "inputsInline": true,
@@ -46,7 +56,9 @@
       "<value name=\"entity\"><block type=\"entity_from_deps\"></block></value>",
       "<value name=\"right\"><block type=\"math_number\"><field name=\"NUM\">0</field></block></value>",
       "<value name=\"up\"><block type=\"math_number\"><field name=\"NUM\">0</field></block></value>",
-      "<value name=\"forward\"><block type=\"math_number\"><field name=\"NUM\">3</field></block></value>"
+      "<value name=\"forward\"><block type=\"math_number\"><field name=\"NUM\">3</field></block></value>",
+      "<value name=\"scale\"><block type=\"math_number\"><field name=\"NUM\">0</field></block></value>",
+      "<value name=\"duration\"><block type=\"math_number\"><field name=\"NUM\">0</field></block></value>"
     ],
     "fields": [
       "effect",
@@ -56,7 +68,9 @@
       "entity",
       "right",
       "up",
-      "forward"
+      "forward",
+      "scale",
+      "duration"
     ],
     "dependencies": [
       {

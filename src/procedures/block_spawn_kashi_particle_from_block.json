@@ -35,6 +35,16 @@
       "type": "input_value",
       "name": "dirz",
       "check": "Number"
+    },
+    {
+      "type": "input_value",
+      "name": "scale",
+      "check": "Number"
+    },
+    {
+      "type": "input_value",
+      "name": "duration",
+      "check": "Number"
     }
   ],
   "inputsInline": true,
@@ -49,7 +59,9 @@
       "<value name=\"z\"><block type=\"coord_z\"></block></value>",
       "<value name=\"dirx\"><block type=\"math_number\"><field name=\"NUM\">0</field></block></value>",
       "<value name=\"diry\"><block type=\"math_number\"><field name=\"NUM\">0</field></block></value>",
-      "<value name=\"dirz\"><block type=\"math_number\"><field name=\"NUM\">0</field></block></value>"
+      "<value name=\"dirz\"><block type=\"math_number\"><field name=\"NUM\">0</field></block></value>",
+      "<value name=\"scale\"><block type=\"math_number\"><field name=\"NUM\">0</field></block></value>",
+      "<value name=\"duration\"><block type=\"math_number\"><field name=\"NUM\">0</field></block></value>"
     ],
     "fields": [
       "effect"
@@ -60,7 +72,9 @@
       "z",
       "dirx",
       "diry",
-      "dirz"
+      "dirz",
+      "scale",
+      "duration"
     ],
     "dependencies": [
       {

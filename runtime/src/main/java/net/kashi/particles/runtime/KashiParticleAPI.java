@@ -2,6 +2,8 @@ package net.kashi.particles.runtime;
 
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
@@ -21,14 +23,12 @@ public final class KashiParticleAPI {
 	/**
 	 * Fires a KASHI effect at a world position, aimed along a direction.
 	 *
-	 * <p>Called on either side. On the server the spawn is broadcast to nearby clients, which is
-	 * where the effect actually renders; {@code level.addParticle} handles that dispatch.
-	 *
 	 * @param dirX,dirY,dirZ the aim direction; pass {@code (0,0,0)} for an unaimed spawn
 	 */
 	public static void spawnKashiParticle(Level level, ResourceLocation effectId,
 			double x, double y, double z, double dirX, double dirY, double dirZ) {
-		spawnKashiParticle(level, effectId, x, y, z, dirX, dirY, dirZ, KashiParticleOptions.NO_ENTITY);
+		spawnKashiParticle(level, effectId, x, y, z, dirX, dirY, dirZ,
+				KashiParticleOptions.NO_ENTITY, 0, 0);
 	}
 
 	/**
@@ -40,12 +40,51 @@ public final class KashiParticleAPI {
 	 */
 	public static void spawnKashiParticle(Level level, ResourceLocation effectId,
 			double x, double y, double z, double dirX, double dirY, double dirZ, int entityId) {
-		ParticleOptions options = new KashiParticleOptions(effectId,
-				(float) dirX, (float) dirY, (float) dirZ, entityId);
+		spawnKashiParticle(level, effectId, x, y, z, dirX, dirY, dirZ, entityId, 0, 0);
+	}
 
-		// addParticle on the server sends a packet; on the client it spawns locally. Either way
-		// the emitter particle is created client-side by the registered provider.
-		level.addParticle(options, x, y, z, 0, 0, 0);
+	/**
+	 * As the no-entity overload, with additive scale/duration offsets on top of what the effect
+	 * authored in Snowstorm.
+	 *
+	 * @param scaleOffset    added to every particle's authored half-width/half-height, floored at
+	 *                       0; {@code 0} leaves the authored size untouched
+	 * @param durationOffset added to the emitter's {@code active_time} (how long it keeps spawning
+	 *                       new particles), not to any individual particle's lifetime; {@code 0}
+	 *                       leaves it untouched
+	 */
+	public static void spawnKashiParticle(Level level, ResourceLocation effectId,
+			double x, double y, double z, double dirX, double dirY, double dirZ,
+			float scaleOffset, float durationOffset) {
+		spawnKashiParticle(level, effectId, x, y, z, dirX, dirY, dirZ,
+				KashiParticleOptions.NO_ENTITY, scaleOffset, durationOffset);
+	}
+
+	/**
+	 * The real implementation: names the entity the spawn came from and applies additive
+	 * scale/duration offsets. Every other overload delegates here.
+	 *
+	 * <p>On the server, {@link Level#addParticle} is a no-op — its body is empty on {@code Level}
+	 * and {@code ServerLevel} does not override it, so calling it server-side never reaches a
+	 * client. {@link ServerLevel#sendParticles} is the real broadcast, and passing
+	 * {@code longDistance = true} widens the broadcast radius from 32 to 512 blocks, so a distant
+	 * effect that is genuinely in view still arrives. On the client, {@code addParticle} spawns
+	 * locally as before.
+	 */
+	public static void spawnKashiParticle(Level level, ResourceLocation effectId,
+			double x, double y, double z, double dirX, double dirY, double dirZ, int entityId,
+			float scaleOffset, float durationOffset) {
+		ParticleOptions options = new KashiParticleOptions(effectId,
+				(float) dirX, (float) dirY, (float) dirZ, entityId,
+				new KashiParticleOptions.Extras(scaleOffset, durationOffset));
+
+		if (level instanceof ServerLevel serverLevel) {
+			for (ServerPlayer player : serverLevel.players())
+				serverLevel.sendParticles(player, options, true, x, y, z, 0, 0, 0, 0, 0);
+		} else {
+			// The emitter particle is created client-side by the registered provider.
+			level.addParticle(options, x, y, z, 0, 0, 0);
+		}
 	}
 
 	/** How the whole effect is turned in the world when an entity fires it. */
@@ -74,9 +113,14 @@ public final class KashiParticleAPI {
 	 * {@code up: 0} lands the effect on the ground under the entity - the common case for auras
 	 * and area effects - rather than requiring a negative offset to compensate for eye height.
 	 * Aim direction still comes from {@link Entity#getLookAngle()}, independent of this anchor.
+	 *
+	 * @param scaleOffset,durationOffset additive offsets on top of what the effect authored; see
+	 *                                   {@link #spawnKashiParticle(Level, ResourceLocation, double,
+	 *                                   double, double, double, double, double, int, float, float)}
 	 */
 	public static void spawnFromEntity(Level level, ResourceLocation effectId, Entity entity,
-			double right, double up, double forward, String aimMode) {
+			double right, double up, double forward, String aimMode,
+			float scaleOffset, float durationOffset) {
 		if (entity == null)
 			return;
 
@@ -97,6 +141,6 @@ public final class KashiParticleAPI {
 		};
 
 		spawnKashiParticle(level, effectId, origin.x, origin.y, origin.z, aim.x, aim.y, aim.z,
-				entity.getId());
+				entity.getId(), scaleOffset, durationOffset);
 	}
 }
