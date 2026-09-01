@@ -17,9 +17,8 @@ engine.
 
 ## Status
 
-**v1.0.0** — first production-ready release. Targets **MCreator 2026.1.x** with the
-**NeoForge 1.21.1** generator (the only generator this plugin implements today — see
-[Roadmap](#roadmap)).
+**v2.0.0** — production-ready. Targets **MCreator 2026.1.x** with the **NeoForge 1.21.1**
+generator (the only generator this plugin implements today — see [docs/ROADMAP.md](docs/ROADMAP.md)).
 
 ## Features
 
@@ -32,9 +31,13 @@ engine.
   curves (linear, catmull_rom, bezier, bezier_chain), local space (follow the entity that fired
   it), events (`particle_effect`, `sound_effect`, `expression`, `sequence`, `randomize`, `log`),
   flipbook animation, and colour gradients/expressions.
-- Three procedure blocks: spawn at a world position, spawn from an entity's eyes (with a
+- Three procedure blocks: spawn at a world position, spawn from an entity's feet (with a
   local-frame offset and an aim mode), and spawn from a block. Aim mode controls how much of the
-  firing entity's look direction the effect inherits.
+  firing entity's look direction the effect inherits. Every block also takes optional additive
+  `scale` and `duration` offsets on top of what the effect authored — `0` (the default) always
+  leaves Snowstorm as the source of truth.
+- Reliable at range and in multiplayer: a fired effect broadcasts to every player within 512
+  blocks, not just the one who fired it.
 - A self-contained MoLang expression compiler and evaluator (`core/`) — no GeckoLib dependency,
   parses once per expression and re-evaluates the compiled form every tick/frame.
 - Wizard-time diagnostics: catches effects that would draw nothing (zero size, zero alpha, a
@@ -71,7 +74,7 @@ engine.
 4. Use one of the three **KASHI Particles** procedure blocks to fire it:
    - **Spawn KASHI Particle at x/y/z** — world position, authored orientation. Best for area
      effects.
-   - **Spawn KASHI Particle from entity** — from the entity's eyes, with a local-frame offset
+   - **Spawn KASHI Particle from entity** — from the entity's feet, with a local-frame offset
      (`forward`/`right`/`up`) and an **aim** mode (full look, yaw-only, or none).
    - **Spawn KASHI Particle from block** — at the centre of a block.
 
