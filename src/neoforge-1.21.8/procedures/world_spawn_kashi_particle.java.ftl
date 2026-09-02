@@ -13,6 +13,12 @@
 	specifically active_time - how long the emitter keeps spawning new particles - not any single
 	particle's own lifetime.
 
+	dirx/diry/dirz and scale/duration all read with a !0 default, not just ${...}: a procedure
+	element saved before one of these inputs existed has no value node for it at all in its stored
+	Blockly XML, and without the default that is a FreeMarker InvalidReferenceException on every
+	regenerate - MCreator does not retroactively add missing inputs to an already-saved block, only
+	a freshly dragged one gets the toolbox_init default.
+
 	Fully-qualified names throughout, because a procedure's generated file has no imports of ours.
 
 	The effect id reproduces MCreator's own registryName transform - see
@@ -24,5 +30,5 @@ if (world instanceof net.minecraft.world.level.Level _kashiLevel${cbi})
 		net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
 			net.kashi.particles.runtime.KashiParticlesRuntime.MODID,
 			"${field$effect?replace("CUSTOM:", "")?replace("(.)([A-Z][a-z]+)", "$1_$2", "r")?replace("([a-z0-9])([A-Z])", "$1_$2", "r")?lower_case}"),
-		${input$x}, ${input$y}, ${input$z}, ${input$dirx}, ${input$diry}, ${input$dirz},
-		(float) (${input$scale}), (float) (${input$duration}));
+		${input$x}, ${input$y}, ${input$z}, ${input$dirx!0}, ${input$diry!0}, ${input$dirz!0},
+		(float) (${input$scale!0}), (float) (${input$duration!0}));
