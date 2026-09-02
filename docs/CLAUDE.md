@@ -62,6 +62,15 @@ Otherwise follow the branch → PR → maintainer-merges workflow in DEVELOPMENT
   Confirmed against the real 1.21.8 source: which event bus a subscriber uses is now inferred per
   event from whether the event type implements `IModBusEvent`, not declared on the annotation.
   Omitting `bus` entirely is the 1.21.8-correct form and reproduces the exact same routing.
+- **MCreator's own code-gen import formatter can inject a wrong import for a bare type name that
+  collides with a real Minecraft/NeoForge class — even when that name is a locally-defined nested
+  type in the very file being generated, never imported from anywhere.** Hit for real: our own
+  `KashiParticleDefinition.Weighted` collided with `net.minecraft.client.sounds.Weighted`, and
+  only on the 1.21.8 generator - `javac` (`check-mod-compile.ps1`) never sees this at all, since
+  it isn't MCreator's import formatter; only an actual MCreator/Gradle build does. Renamed our
+  type instead of fighting the formatter (`WeightedOption`) - the general lesson is to keep our
+  own nested type names distinctive enough not to collide with a Minecraft/NeoForge class of the
+  same simple name, since `check-mod-compile.ps1` alone will not catch it if one does.
 - **`tools/check-mod-compile.ps1` type-checks against the workspace's own `build/moddev/
   clientLegacyClasspath.txt`, not a blind scan of `~/.mcreator/gradle/caches`.** Two test
   workspaces share that cache; a bare scan can pick up two different versions of the same library

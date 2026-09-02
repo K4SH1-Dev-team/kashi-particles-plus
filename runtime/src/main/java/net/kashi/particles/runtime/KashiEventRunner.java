@@ -108,7 +108,7 @@ final class KashiEventRunner {
 	private static EventNode pick(EventNode.Randomize randomize, ClientLevel level) {
 		double total = 0;
 
-		for (KashiParticleDefinition.Weighted option : randomize.options())
+		for (KashiParticleDefinition.WeightedOption option : randomize.options())
 			total += Math.max(0, option.weight());
 
 		if (total <= 0)
@@ -116,7 +116,7 @@ final class KashiEventRunner {
 
 		double roll = level.random.nextDouble() * total;
 
-		for (KashiParticleDefinition.Weighted option : randomize.options()) {
+		for (KashiParticleDefinition.WeightedOption option : randomize.options()) {
 			roll -= Math.max(0, option.weight());
 
 			if (roll <= 0)
