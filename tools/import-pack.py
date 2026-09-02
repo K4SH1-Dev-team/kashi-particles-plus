@@ -41,8 +41,15 @@ PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCAL_ROOT = os.path.join(os.path.dirname(PROJECT), "local")
 PACK = os.path.join(LOCAL_ROOT, "ds rp")
 PARTICLES = os.path.join(PACK, "particles")
-WORKSPACE = os.path.join(LOCAL_ROOT, "workspace", "kashi_particle_test")
-MODID = "kashi_particle_test"
+
+# Which workspace to write into - overridable with --workspace, since there is now one test
+# workspace per generator (see docs/DEVELOPMENT.md). Both existing workspaces happen to have their
+# folder name equal to their mod id, so one flag covers both; WORKSPACE/MODID/etc. below are
+# (re)computed from it in main() once args are parsed, so they stay correct either way.
+DEFAULT_WORKSPACE = "kashi_particle_test"
+
+WORKSPACE = os.path.join(LOCAL_ROOT, "workspace", DEFAULT_WORKSPACE)
+MODID = DEFAULT_WORKSPACE
 
 ELEMENTS = os.path.join(WORKSPACE, "elements")
 TEXTURES = os.path.join(WORKSPACE, "src", "main", "resources", "assets", MODID, "textures", "particle")
@@ -178,7 +185,7 @@ def write_element(name, kind, definition):
 
 
 def main():
-    global AIM
+    global AIM, WORKSPACE, MODID, ELEMENTS, TEXTURES, WORKSPACE_FILE
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=0, help="import only the first N effects")
@@ -187,9 +194,19 @@ def main():
                         help="effects only - no procedures and no items")
     parser.add_argument("--aim", choices=["HORIZONTAL", "FULL", "NONE"], default=AIM,
                         help="how the generated procedures aim the effect (default %s)" % AIM)
+    parser.add_argument("--workspace", default=DEFAULT_WORKSPACE,
+                        help="local/workspace/<name> to import into (default %s); its mod id is "
+                             "assumed to equal <name>, true of every workspace this project has "
+                             "used so far" % DEFAULT_WORKSPACE)
     args = parser.parse_args()
 
     AIM = args.aim
+
+    WORKSPACE = os.path.join(LOCAL_ROOT, "workspace", args.workspace)
+    MODID = args.workspace
+    ELEMENTS = os.path.join(WORKSPACE, "elements")
+    TEXTURES = os.path.join(WORKSPACE, "src", "main", "resources", "assets", MODID, "textures", "particle")
+    WORKSPACE_FILE = os.path.join(WORKSPACE, MODID + ".mcreator")
 
     if not os.path.isdir(ELEMENTS):
         sys.exit("workspace not found: " + WORKSPACE)
