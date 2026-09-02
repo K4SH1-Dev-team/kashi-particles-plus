@@ -6,7 +6,11 @@
 	API is called from.
 
 	scale/duration are additive offsets on top of what the effect authored, both defaulting to 0 -
-	see world_spawn_kashi_particle.java.ftl for what they do.
+	see world_spawn_kashi_particle.java.ftl for what they do. The !0 default matters here beyond
+	the toolbox default: a procedure element saved before this input existed has no value node for
+	it at all in its stored Blockly XML, and without !0 that is a FreeMarker
+	InvalidReferenceException on every regenerate - MCreator does not retroactively add missing
+	inputs to an already-saved block, only a freshly dragged one gets the toolbox_init default.
 
 	The effect id is field$effect (e.g. "CUSTOM:ThunderTrail") with the prefix stripped and put
 	through the SAME transform MCreator's own registryName generation uses, reproduced here because
@@ -34,4 +38,4 @@ if (world instanceof net.minecraft.world.level.Level _kashiLevel${cbi})
 			net.kashi.particles.runtime.KashiParticlesRuntime.MODID,
 			"${field$effect?replace("CUSTOM:", "")?replace("(.)([A-Z][a-z]+)", "$1_$2", "r")?replace("([a-z0-9])([A-Z])", "$1_$2", "r")?lower_case}"),
 		${input$entity}, ${input$right}, ${input$up}, ${input$forward}, "${field$aim}",
-		(float) (${input$scale}), (float) (${input$duration}));
+		(float) (${input$scale!0}), (float) (${input$duration!0}));
