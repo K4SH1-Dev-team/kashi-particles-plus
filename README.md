@@ -17,7 +17,7 @@ engine.
 
 ## Status
 
-**v2.5.0** — production-ready. Targets **MCreator 2026.1.x**, with either the **NeoForge 1.21.1**
+**v2.5.1** — production-ready. Targets **MCreator 2026.1.x**, with either the **NeoForge 1.21.1**
 or **NeoForge 1.21.8** generator (see [docs/ROADMAP.md](docs/ROADMAP.md) for what's next).
 
 ## Features
