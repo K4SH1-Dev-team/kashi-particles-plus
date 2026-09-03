@@ -26,14 +26,18 @@ core/       Pure-Java parser + MoLang compiler/evaluator. No MCreator or Minecra
 runtime/    The mod-side runtime: particle engine, render types, the debug command, event
             runner. Plain Java under the fixed package net.kashi.particles.*, written once and
             templated almost verbatim into every generated mod (see make-runtime-templates.ps1).
-            Shared by both generators; a few files that genuinely differ between them (real
-            NeoForge API differences, not guessed - see docs/ARCHITECTURE.md) live in
-            runtime-1.21.8/ instead of a second copy of the whole tree.
+            Shared by every generator; a few files that genuinely differ between them (real
+            NeoForge API differences, not guessed - see docs/ARCHITECTURE.md) live in a per-
+            generator overlay directory (runtime-1.21.8/, and more as later generators need one)
+            instead of a second copy of the whole tree.
 src/        The actual MCreator plugin payload: plugin.json, lang strings, procedure block
-            definitions, each generator's own (neoforge-1.21.1/, neoforge-1.21.8/) templates and
-            definition.yaml, themes (element icon). Zipped as-is into the plugin.
+            definitions, each generator's own (neoforge-1.21.1/, neoforge-1.21.8/, ...) templates
+            and definition.yaml, themes (element icon). Zipped as-is into the plugin.
 src-java/   The plugin's own Java: the mod element type, its wizard GUI, the plugin entry point.
-            Compiled against mcreator.exe (see above).
+            Compiled against EVERY supported MCreator install's own mcreator.exe (see above) -
+            the source is identical either way, but each is compiled and zipped separately so a
+            real net.mcreator.* API difference between MCreator versions shows up as a build
+            error instead of shipping a zip that only happens to work against one of them.
 tools/      Every dev script below.
 ```
 
@@ -47,22 +51,31 @@ version control:
 <project root>/
 ├── github/     <- this repo
 └── local/
-    ├── mcreator/     <- your MCreator install
+    ├── mcreator/                 <- your MCreator 2026.1 install (JDK 21)
+    ├── 02 - MCreator20262/       <- your MCreator 2026.2 install (JDK 25)
     └── workspace/
-        ├── kashi_particle_test/   <- your dev/test workspace, NeoForge 1.21.1 generator
-        └── teste_vinte_oito/      <- your dev/test workspace, NeoForge 1.21.8 generator
+        ├── kashi_particle_test/   <- dev/test workspace, NeoForge 1.21.1, MCreator 2026.1
+        ├── teste_vinte_oito/      <- dev/test workspace, NeoForge 1.21.8, MCreator 2026.1
+        └── true_particle_test/    <- dev/test workspace, NeoForge 1.21.1, MCreator 2026.2
 ```
 
-- **`local/mcreator/`** — a local MCreator install (`mcreator.exe` directly inside it), with both
-  the `generator-1.21.1` and `generator-1.21.8` plugins present. Bring your own; every script that
-  needs it (`tools/build-plugin.ps1`, `tools/check-mod-compile.ps1`,
-  `tools/inspect-particle.ps1`, `tools/validate-particles.ps1`) resolves it as `../local/mcreator`
-  relative to this repo.
-- **Two dev/test MCreator workspaces**, one per generator this plugin supports — `tools/
-  check-mod-compile.ps1` and `tools/sync-core-to-workspace.ps1` both hardcode the two exact folder
-  names above. Open and build each in MCreator at least once first, so its Gradle moddev "merged"
-  jar and resolved classpath exist on disk. If you only work on one generator day-to-day, the
-  other workspace can be left as-is - both scripts skip a workspace folder that doesn't exist.
+- **Two local MCreator installs, each fully isolated** (`mcreator.exe` directly inside it, own
+  `jdk/`, own `plugins/`) — never the WESLEY-shared installs one drive level up, so this project's
+  plugin dev never interferes with (or is broken by) other MCreator projects on the same machine.
+  Bring your own; every script that needs one (`tools/build-plugin.ps1`,
+  `tools/check-mod-compile.ps1`, `tools/run-core-tests.ps1`) resolves both as `../local/mcreator`
+  and `../local/02 - MCreator20262` relative to this repo, and loops over both. The two installs
+  are **not interchangeable**: 2026.1 bundles JDK 21 and offers `generator-1.21.1`/
+  `generator-1.21.8`; 2026.2 bundles JDK 25 (a real requirement of its generators' own
+  `build.gradle`, not a MCreator preference) and offers `generator-1.21.1` again plus the newer
+  `generator-26.1.x` (real generator id `neoforge-26.1.2`) and `generator-26.2.x` (real generator
+  id `neoforge-26.2`) - see docs/ARCHITECTURE.md for what's confirmed to differ API-wise.
+- **One dev/test MCreator workspace per (generator, MCreator install) pair this plugin supports**
+  — `tools/check-mod-compile.ps1` and `tools/sync-core-to-workspace.ps1` both hardcode the exact
+  workspace list, each tagged with which install to type-check it against. Open and build each in
+  its MCreator at least once first, so its Gradle moddev "merged" jar and resolved classpath exist
+  on disk. If you only work on one generator day-to-day, the other workspaces can be left as-is -
+  both scripts skip a workspace folder that doesn't exist.
 - PowerShell and Python 3 with `numpy` (only needed for `optimize-textures.py`, which is offline
   tooling, not part of the shipped runtime).
 
@@ -75,9 +88,10 @@ update the `$localRoot`/`LOCAL_ROOT` line near the top of each script accordingl
 Run in this order after changing anything under `core/` or `runtime/`:
 
 1. **`tools/run-core-tests.ps1`** — compiles and runs the dependency-free core test suite
-   (MoLang evaluator + parser smoke tests) against the JDK and gson MCreator itself ships, so
-   nothing extra to install and the exact gson version the runtime will meet. Fast; run this
-   first, always.
+   (MoLang evaluator + parser smoke tests) against the JDK and gson each supported MCreator
+   install ships (both JDK 21 and JDK 25, see Prerequisites above), so nothing extra to install
+   and the exact gson version the runtime will meet under either toolchain. Fast; run this first,
+   always.
 2. **`tools/sync-core-to-workspace.ps1`** — copies `core/` and `runtime/` into each dev
    workspace's source tree (applying that workspace's generator overlay, if it has one), so each
    workspace can compile and run them for manual in-game testing.
@@ -89,9 +103,10 @@ Run in this order after changing anything under `core/` or `runtime/`:
    regenerates that generator's `kashiparticle.definition.yaml`, once per generator. The one thing
    it parameterises in the Java itself is the mod id (a compile-time constant in the generated
    code) — read the comment at the top before changing that logic.
-5. **`tools/build-plugin.ps1`** — compiles `src-java/` + `core/` against `mcreator.exe`, zips
-   `src/` plus the compiled classes into the plugin, and installs it into your local MCreator's
-   `plugins/` folder.
+5. **`tools/build-plugin.ps1`** — compiles `src-java/` + `core/` against each supported MCreator
+   install's own `mcreator.exe`, zips `src/` plus that install's compiled classes into the plugin,
+   and installs it into that install's `plugins/` folder. Repeats per install (see Prerequisites
+   above), not just once.
 
 Other tools, used as needed rather than every change:
 

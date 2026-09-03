@@ -79,6 +79,35 @@ Otherwise follow the branch → PR → maintainer-merges workflow in DEVELOPMENT
   classes, and without an explicit `-sourcepath`, javac defaults it to the classpath, finds those,
   and type-checks them too - `-implicit:none` does **not** stop this (it only suppresses writing
   their `.class` output, not the type-checking itself, confirmed by trying it first).
+- **A plugin needs its MCreator app version declared in `supportedversions`, not just a compatible
+  generator.** `src/plugin.json`'s `supportedversions` (`2026001` for MCreator 2026.1) is a
+  separate gate from which generator a workspace uses - confirmed against `generator-26.2.x`'s own
+  `plugin.json`, which declares `"supportedversions": [2026002]`. Forgetting to add a new
+  MCreator version's code here means MCreator may not even offer/load the plugin under that
+  version, regardless of whether the code itself would work.
+- **Two local MCreator installs now, not one, and their JDKs are not interchangeable.** MCreator
+  2026.2's generators (`neoforge-26.1.2`, `neoforge-26.2`) require Java 25
+  (`java.toolchain.languageVersion = JavaLanguageVersion.of(25)` in their own `workspacebase/
+  build.gradle`) where 2026.1's (`neoforge-1.21.1`, `neoforge-1.21.8`) require Java 21 - confirmed
+  by running `java -version` against each install's own bundled `jdk/`. `build-plugin.ps1`,
+  `check-mod-compile.ps1` and `run-core-tests.ps1` all resolve a small installs table and loop over
+  it rather than assuming a single `local/mcreator` - see docs/DEVELOPMENT.md.
+- **The same NeoForge 1.21.1 generator behaves slightly differently depending on which MCreator
+  app builds it.** Under MCreator 2026.2, `@EventBusSubscriber(bus = ...)` compiles but is flagged
+  `[removal]`-deprecated for `neoforge-1.21.1` too (not just `neoforge-1.21.8`, where it's already
+  gone) - even though that workspace's merged jar (`neoforge-21.1.190-merged.jar`) is byte-
+  identical to the one MCreator 2026.1 resolves for the same generator. The moddev tooling bundled
+  with the newer MCreator app apparently pulls in a newer FancyModLoader than the older app does,
+  for the exact same pinned NeoForge version. Not yet a build error anywhere, so `runtime/` is
+  left alone for now - but this is an early signal that `bus=` may eventually need dropping from
+  the shared `neoforge-1.21.1` files too, and that an overlay might someday need to key off
+  (generator, MCreator install) rather than generator alone, which the current mechanism doesn't
+  model.
+- **`generator-addon-26.1x.zip` (bundled alongside MCreator 2026.2's NeoForge 26.1 generator) is a
+  Bedrock Edition content generator** (`beblock`/`beentity`/`beitem` definitions) - unrelated to
+  this plugin, which only ever generates Java/NeoForge mods. Confirmed by its own `plugin.json`
+  name. Don't confuse it with `generator-26.1.x.zip` (the actual NeoForge Java generator this
+  plugin targets).
 
 ## Docs
 

@@ -13,19 +13,25 @@
 $ErrorActionPreference = "Stop"
 
 $project   = Split-Path -Parent $PSScriptRoot
-# The repo (this script's parent tree) and the local-only dev environment (MCreator install,
+# The repo (this script's parent tree) and the local-only dev environment (MCreator installs,
 # test workspaces) are sibling folders under the project root - see docs/DEVELOPMENT.md.
 $localRoot = Join-Path (Split-Path -Parent $project) "local"
-$mcreator  = Join-Path $localRoot "mcreator"
 
-$javac = Join-Path $mcreator "jdk\bin\javac.exe"
-if (-not (Test-Path $javac)) { throw "JDK not found at $javac" }
+# One entry per local MCreator install this plugin supports - each workspace below points at one
+# by Label. Matches build-plugin.ps1's $installs list. Each install bundles its own JDK, and they
+# are NOT interchangeable: 2026.2's generators require Java 25, 2026.1's require Java 21 (see
+# docs/DEVELOPMENT.md) - javac from the wrong install can't even read the other's class files.
+$installs = @{
+    "2026.1" = Join-Path $localRoot "mcreator"
+    "2026.2" = Join-Path $localRoot "02 - MCreator20262"
+}
 
-# One entry per test workspace - same list as sync-core-to-workspace.ps1. "Label" is only for the
-# summary line.
+# One entry per test workspace - same list as sync-core-to-workspace.ps1, plus which install's
+# JDK to type-check it with. "Label" is only for the summary line.
 $workspaces = @(
-    [pscustomobject]@{ Name = "kashi_particle_test"; Label = "NeoForge 1.21.1" },
-    [pscustomobject]@{ Name = "teste_vinte_oito";    Label = "NeoForge 1.21.8" }
+    [pscustomobject]@{ Name = "kashi_particle_test"; Label = "NeoForge 1.21.1 (MCreator 2026.1)"; Install = "2026.1" },
+    [pscustomobject]@{ Name = "teste_vinte_oito";    Label = "NeoForge 1.21.8 (MCreator 2026.1)"; Install = "2026.1" },
+    [pscustomobject]@{ Name = "true_particle_test";  Label = "NeoForge 1.21.1 (MCreator 2026.2)"; Install = "2026.2" }
 )
 
 $overallCode = 0
@@ -36,6 +42,12 @@ foreach ($ws in $workspaces) {
         Write-Host "[$($ws.Name)] workspace not found - skipped"
         continue
     }
+
+    $mcreator = $installs[$ws.Install]
+    if (-not $mcreator) { throw "[$($ws.Name)] unknown install label `"$($ws.Install)`"" }
+
+    $javac = Join-Path $mcreator "jdk\bin\javac.exe"
+    if (-not (Test-Path $javac)) { throw "[$($ws.Name)] JDK not found at $javac (install `"$($ws.Install)`")" }
 
     $out = Join-Path $env:TEMP "kashi-modcheck-$($ws.Name)"
 
