@@ -1,4 +1,5 @@
-# Builds the KASHI Particles Plus MCreator plugin and installs it into the test MCreator copy.
+# Builds the KASHI Particles Plus MCreator plugin and installs it into every local MCreator copy
+# this plugin supports (see $installs below).
 #
 # The plugin zip is: everything under src/ at the zip root, plus the compiled plugin classes.
 #
@@ -9,28 +10,33 @@
 # found". launch4j wraps the archive with a ~192 KB stub in front, and javac needs a clean jar.
 # .NET's ZipArchive, unlike javac, happily reads the archive once the front stub is removed, so
 # we strip the stub in memory, then copy every entry through ZipArchive into a fresh jar that
-# javac accepts. No external tools, no trailer trouble. Cached; only redone when the exe changes.
+# javac accepts. No external tools, no trailer trouble. Cached per install; only redone when that
+# install's exe changes.
+#
+# Two MCreator *applications* now, not just two generators: 2026.1 and 2026.2 each ship their own
+# mcreator.exe, with their own net.mcreator.* plugin API and their own bundled JDK (21 vs 25 - see
+# docs/DEVELOPMENT.md). src-java/ + core/ are compiled and zipped ONCE PER INSTALL, each against
+# that install's own extracted API and JDK, so a plugin API change between the two apps would show
+# up here as a real compile error instead of silently shipping a zip that only happens to work
+# against one of them.
 
 $ErrorActionPreference = "Stop"
 
 $project  = Split-Path -Parent $PSScriptRoot
-# The repo (this script's parent tree) and the local-only dev environment (MCreator install,
+# The repo (this script's parent tree) and the local-only dev environment (MCreator installs,
 # test workspaces) are sibling folders under the project root - see docs/DEVELOPMENT.md.
 $localRoot = Join-Path (Split-Path -Parent $project) "local"
-$mcreator  = Join-Path $localRoot "mcreator"
-$work     = Join-Path $env:TEMP "kashi-plugin-build"
-$apiJar   = Join-Path $work "mcreator-api.jar"
-$classes  = Join-Path $work "classes"
-$staging  = Join-Path $work "staging"
-$output   = Join-Path $mcreator "plugins\kashi_particles_plus.zip"
 
-$javac = Join-Path $mcreator "jdk\bin\javac.exe"
-$jar   = Join-Path $mcreator "jdk\bin\jar.exe"
-$exe   = Join-Path $mcreator "mcreator.exe"
+# One entry per local MCreator install this plugin supports. Each is a fully isolated copy (own
+# mcreator.exe, own jdk/, own plugins/) - see docs/DEVELOPMENT.md and the
+# [[ambiente-de-teste-isolado]] memory for why this project never points at the WESLEY-shared
+# MCreator installs.
+$installs = @(
+    [pscustomobject]@{ Label = "2026.1"; Root = Join-Path $localRoot "mcreator" },
+    [pscustomobject]@{ Label = "2026.2"; Root = Join-Path $localRoot "02 - MCreator20262" }
+)
 
-if (-not (Test-Path $javac)) { throw "JDK not found at $javac" }
-if (-not (Test-Path $exe))   { throw "mcreator.exe not found at $exe" }
-
+$work = Join-Path $env:TEMP "kashi-plugin-build"
 New-Item -ItemType Directory -Path $work -Force | Out-Null
 
 # Guards a bug that cost two full test cycles to find and un-find: a procedure .ftl resolving a
@@ -65,101 +71,122 @@ if ($badPattern) {
     throw "resolve the effect id by reproducing MCreator's registryName transform instead - see the comment above this check"
 }
 
-$apiStamp = Join-Path $work "mcreator-api.stamp"
-$exeStamp = (Get-Item $exe).LastWriteTime.Ticks.ToString()
+foreach ($install in $installs) {
+    $mcreator = $install.Root
+    $iwork    = Join-Path $work $install.Label
+    $apiJar   = Join-Path $iwork "mcreator-api.jar"
+    $classes  = Join-Path $iwork "classes"
+    $staging  = Join-Path $iwork "staging"
+    $output   = Join-Path $mcreator "plugins\kashi_particles_plus.zip"
 
-if (-not (Test-Path $apiJar) -or -not (Test-Path $apiStamp) -or (Get-Content $apiStamp) -ne $exeStamp) {
-    Write-Host "Extracting the MCreator API from mcreator.exe (one-off, cached)..."
+    $javac = Join-Path $mcreator "jdk\bin\javac.exe"
+    $exe   = Join-Path $mcreator "mcreator.exe"
 
+    if (-not (Test-Path $mcreator)) {
+        Write-Host "[$($install.Label)] install not found at $mcreator - skipped"
+        continue
+    }
+    if (-not (Test-Path $javac)) { throw "[$($install.Label)] JDK not found at $javac" }
+    if (-not (Test-Path $exe))   { throw "[$($install.Label)] mcreator.exe not found at $exe" }
+
+    New-Item -ItemType Directory -Path $iwork -Force | Out-Null
+
+    $apiStamp = Join-Path $iwork "mcreator-api.stamp"
+    $exeStamp = (Get-Item $exe).LastWriteTime.Ticks.ToString()
+
+    if (-not (Test-Path $apiJar) -or -not (Test-Path $apiStamp) -or (Get-Content $apiStamp) -ne $exeStamp) {
+        Write-Host "[$($install.Label)] extracting the MCreator API from mcreator.exe (one-off, cached)..."
+
+        Add-Type -AssemblyName System.IO.Compression
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+        $bytes = [System.IO.File]::ReadAllBytes($exe)
+        $offset = -1
+
+        for ($i = 0; $i -lt $bytes.Length - 4; $i++) {
+            if ($bytes[$i] -eq 0x50 -and $bytes[$i+1] -eq 0x4B -and $bytes[$i+2] -eq 0x03 -and $bytes[$i+3] -eq 0x04) {
+                $offset = $i
+                break
+            }
+        }
+
+        if ($offset -lt 0) { throw "[$($install.Label)] no zip archive found inside mcreator.exe" }
+
+        $stripped = Join-Path $iwork "mcreator-stripped.zip"
+        [System.IO.File]::WriteAllBytes($stripped, $bytes[$offset..($bytes.Length - 1)])
+
+        if (Test-Path $apiJar) { Remove-Item $apiJar -Force }
+
+        $count = 0
+        $source = [System.IO.Compression.ZipFile]::OpenRead($stripped)
+        try {
+            $dest = [System.IO.Compression.ZipFile]::Open($apiJar, [System.IO.Compression.ZipArchiveMode]::Create)
+            try {
+                foreach ($entry in $source.Entries) {
+                    if ($entry.FullName.EndsWith("/")) { continue }
+
+                    $target = $dest.CreateEntry($entry.FullName, [System.IO.Compression.CompressionLevel]::Optimal)
+                    $inStream = $entry.Open()
+                    $outStream = $target.Open()
+
+                    try { $inStream.CopyTo($outStream) } finally { $outStream.Dispose(); $inStream.Dispose() }
+
+                    $count++
+                }
+            } finally { $dest.Dispose() }
+        } finally { $source.Dispose() }
+
+        Remove-Item $stripped -Force
+        Set-Content $apiStamp $exeStamp -Encoding utf8
+
+        Write-Host "[$($install.Label)]   repacked $count entries into a clean jar"
+    }
+
+    foreach ($dir in @($classes, $staging)) {
+        if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+
+    $libs = (Get-ChildItem (Join-Path $mcreator "lib") -Filter "*.jar" | ForEach-Object { $_.FullName }) -join ";"
+    $classpath = "$apiJar;$libs"
+
+    # The wizard validates imported .particle.json with the SAME parser the mod runtime uses, so the
+    # core sources compile into the plugin too - one source of truth for parsing.
+    $sources = @()
+    $sources += Get-ChildItem (Join-Path $project "src-java") -Recurse -Filter "*.java" | ForEach-Object { $_.FullName }
+    $sources += Get-ChildItem (Join-Path $project "core\src\main\java") -Recurse -Filter "*.java" | ForEach-Object { $_.FullName }
+
+    Write-Host "[$($install.Label)] compiling $($sources.Count) plugin source file(s) against this install's own API..."
+    # -proc:none: MCreator's own dependencies drag annotation processors onto the classpath that we
+    # have no use for, and javac warns about them on every build.
+    & $javac -encoding UTF-8 -proc:none -classpath $classpath -d $classes $sources
+    if ($LASTEXITCODE -ne 0) { throw "[$($install.Label)] plugin compilation failed" }
+
+    Copy-Item (Join-Path $project "src\*") $staging -Recurse -Force
+    Copy-Item (Join-Path $classes "*") $staging -Recurse -Force
+
+    # NOT Compress-Archive: on Windows PowerShell it writes zip entries with backslash separators,
+    # which violates the ZIP spec. Java's classloader then cannot find the classes and the plugin
+    # reports "fully loaded: no" with a ClassNotFoundException. We build the zip through .NET and
+    # force forward slashes on every entry name.
     Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-    $bytes = [System.IO.File]::ReadAllBytes($exe)
-    $offset = -1
+    if (Test-Path $output) { Remove-Item $output -Force }
 
-    for ($i = 0; $i -lt $bytes.Length - 4; $i++) {
-        if ($bytes[$i] -eq 0x50 -and $bytes[$i+1] -eq 0x4B -and $bytes[$i+2] -eq 0x03 -and $bytes[$i+3] -eq 0x04) {
-            $offset = $i
-            break
-        }
-    }
-
-    if ($offset -lt 0) { throw "no zip archive found inside mcreator.exe" }
-
-    $stripped = Join-Path $work "mcreator-stripped.zip"
-    [System.IO.File]::WriteAllBytes($stripped, $bytes[$offset..($bytes.Length - 1)])
-
-    if (Test-Path $apiJar) { Remove-Item $apiJar -Force }
-
-    $count = 0
-    $source = [System.IO.Compression.ZipFile]::OpenRead($stripped)
+    $stagingFull = (Resolve-Path $staging).Path
+    $archive = [System.IO.Compression.ZipFile]::Open($output, [System.IO.Compression.ZipArchiveMode]::Create)
     try {
-        $dest = [System.IO.Compression.ZipFile]::Open($apiJar, [System.IO.Compression.ZipArchiveMode]::Create)
-        try {
-            foreach ($entry in $source.Entries) {
-                if ($entry.FullName.EndsWith("/")) { continue }
+        Get-ChildItem $stagingFull -Recurse -File | ForEach-Object {
+            $entryName = $_.FullName.Substring($stagingFull.Length + 1).Replace("\", "/")
 
-                $target = $dest.CreateEntry($entry.FullName, [System.IO.Compression.CompressionLevel]::Optimal)
-                $inStream = $entry.Open()
-                $outStream = $target.Open()
+            [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $archive, $_.FullName, $entryName, [System.IO.Compression.CompressionLevel]::Optimal)
+        }
+    } finally { $archive.Dispose() }
 
-                try { $inStream.CopyTo($outStream) } finally { $outStream.Dispose(); $inStream.Dispose() }
+    $verify = [System.IO.Compression.ZipFile]::OpenRead($output)
+    try { $entryCount = $verify.Entries.Count } finally { $verify.Dispose() }
 
-                $count++
-            }
-        } finally { $dest.Dispose() }
-    } finally { $source.Dispose() }
-
-    Remove-Item $stripped -Force
-    Set-Content $apiStamp $exeStamp -Encoding utf8
-
-    Write-Host "  repacked $count entries into a clean jar"
+    Write-Host "[$($install.Label)] installed: $output ($entryCount entries)`n"
 }
-
-foreach ($dir in @($classes, $staging)) {
-    if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
-    New-Item -ItemType Directory -Path $dir -Force | Out-Null
-}
-
-$libs = (Get-ChildItem (Join-Path $mcreator "lib") -Filter "*.jar" | ForEach-Object { $_.FullName }) -join ";"
-$classpath = "$apiJar;$libs"
-
-# The wizard validates imported .particle.json with the SAME parser the mod runtime uses, so the
-# core sources compile into the plugin too - one source of truth for parsing.
-$sources = @()
-$sources += Get-ChildItem (Join-Path $project "src-java") -Recurse -Filter "*.java" | ForEach-Object { $_.FullName }
-$sources += Get-ChildItem (Join-Path $project "core\src\main\java") -Recurse -Filter "*.java" | ForEach-Object { $_.FullName }
-
-Write-Host "Compiling $($sources.Count) plugin source file(s)..."
-# -proc:none: MCreator's own dependencies drag annotation processors onto the classpath that we
-# have no use for, and javac warns about them on every build.
-& $javac -encoding UTF-8 -proc:none -classpath $classpath -d $classes $sources
-if ($LASTEXITCODE -ne 0) { throw "plugin compilation failed" }
-
-Copy-Item (Join-Path $project "src\*") $staging -Recurse -Force
-Copy-Item (Join-Path $classes "*") $staging -Recurse -Force
-
-# NOT Compress-Archive: on Windows PowerShell it writes zip entries with backslash separators,
-# which violates the ZIP spec. Java's classloader then cannot find the classes and the plugin
-# reports "fully loaded: no" with a ClassNotFoundException. We build the zip through .NET and
-# force forward slashes on every entry name.
-Add-Type -AssemblyName System.IO.Compression
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-
-if (Test-Path $output) { Remove-Item $output -Force }
-
-$stagingFull = (Resolve-Path $staging).Path
-$archive = [System.IO.Compression.ZipFile]::Open($output, [System.IO.Compression.ZipArchiveMode]::Create)
-try {
-    Get-ChildItem $stagingFull -Recurse -File | ForEach-Object {
-        $entryName = $_.FullName.Substring($stagingFull.Length + 1).Replace("\", "/")
-
-        [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
-            $archive, $_.FullName, $entryName, [System.IO.Compression.CompressionLevel]::Optimal)
-    }
-} finally { $archive.Dispose() }
-
-Write-Host "`nInstalled: $output"
-Write-Host "Entries (must use forward slashes):"
-$verify = [System.IO.Compression.ZipFile]::OpenRead($output)
-try { $verify.Entries | ForEach-Object { "  " + $_.FullName } } finally { $verify.Dispose() }

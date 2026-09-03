@@ -19,9 +19,12 @@ $localRoot = Join-Path (Split-Path -Parent $project) "local"
 
 # One entry per test workspace. "Overlay" mirrors make-runtime-templates.ps1's $generators list -
 # a directory laid out like runtime/ whose files replace the shared ones for that workspace only.
+# Which MCreator install/JDK a workspace was built with doesn't matter here - this script only
+# copies .java source, it never invokes a compiler (see check-mod-compile.ps1 for that).
 $workspaces = @(
     [pscustomobject]@{ Name = "kashi_particle_test"; Overlay = $null },
-    [pscustomobject]@{ Name = "teste_vinte_oito";    Overlay = "runtime-1.21.8" }
+    [pscustomobject]@{ Name = "teste_vinte_oito";    Overlay = "runtime-1.21.8" },
+    [pscustomobject]@{ Name = "true_particle_test";  Overlay = $null }
 )
 
 foreach ($ws in $workspaces) {

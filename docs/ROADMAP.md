@@ -101,11 +101,39 @@ MCreator revelou:
 Testado manualmente pelo usuário nas duas workspaces após a correção: build OK, os 4 modos de
 blend visualmente corretos, broadcast a longa distância confirmado.
 
-### Fase 4 — Porte para MCreator 2026.2
-Novos geradores: NeoForge 26.1 e 26.2 (o 1.21.8 já foi feito na V2.5 acima). Mesmo mecanismo de
-overlay já estabelecido deve se aplicar — criar `src/neoforge-26.x/`, uma nova workspace de teste
-por versão, e revalidar contra a API real de cada uma antes de assumir que algo compila (o MoLang
-engine em `core/` não depende de Minecraft, então essa parte deve migrar sem atrito).
+### Fase 4 / V3.0.0 — Porte para MCreator 2026.2 (em andamento)
+Maior que a V2.5: aqui mudam duas coisas ao mesmo tempo — o aplicativo MCreator em si (2026.1 →
+2026.2, com sua própria API de plugin) e a API Minecraft/NeoForge por trás de dois geradores novos
+(`neoforge-26.1.2` e `neoforge-26.2`; o `1.21.8` já foi feito na V2.5 acima). Matriz final: MCreator
+2026.1 → `1.21.1`/`1.21.8`; MCreator 2026.2 → `1.21.1`/`26.1.2`/`26.2`.
+
+**Etapa A concluída** (não dependia de novas workspaces):
+
+- `src/plugin.json` ganhou `2026002` em `supportedversions` — sem isso o MCreator 2026.2
+  provavelmente nem ofereceria o plugin (confirmado comparando com o `plugin.json` do próprio
+  gerador `generator-26.2.x`).
+- `src-java/` + `core/` compilam sem nenhuma mudança contra a API de plugin (`net.mcreator.*`) do
+  MCreator 2026.2 — confirmado compilando de verdade contra o `mcreator.exe` extraído dessa
+  instalação, não suposto.
+- Pipeline inteira (`build-plugin.ps1`, `check-mod-compile.ps1`, `run-core-tests.ps1`) generalizada
+  pra uma tabela de instalações — os dois MCreators isolados (`local/mcreator` = 2026.1/JDK 21,
+  `local/02 - MCreator20262` = 2026.2/JDK 25) não são intercambiáveis, os dois geradores novos
+  exigem Java 25 de verdade (`build.gradle` de cada um, não preferência do MCreator).
+- Workspace `true_particle_test` (MCreator 2026.2, gerador `neoforge-1.21.1`) sincronizada e
+  type-checada contra o merged jar real — OK, mesmo build NeoForge (`21.1.190`) que sob o MCreator
+  2026.1. Achado à parte: sob o app 2026.2 o mesmo gerador `1.21.1` já mostra
+  `@EventBusSubscriber(bus = ...)` como `[removal]`-deprecated (ainda compila) — sinal de que essa
+  mesma correção que o `1.21.8` já recebeu pode um dia ser necessária ali também. Ver
+  [CLAUDE.md](CLAUDE.md).
+- `generator-addon-26.1x` identificado e descartado do escopo — é um gerador **Bedrock Edition**
+  (behavior/resource pack), não Java/NeoForge.
+
+**Pendente (Etapa B)**: usuário precisa criar, dentro do MCreator 2026.2, uma workspace de teste
+por gerador novo (`neoforge-26.1.2` e `neoforge-26.2`, mesmo processo que gerou a `teste_vinte_oito`
+antes da V2.5) e buildar cada uma pelo menos uma vez, pra então investigar a API real de cada uma
+(merged jar, `javap`/leitura de fonte) e estender o mecanismo de overlay conforme o que for
+encontrado — sem herdar conclusões do `1.21.8` por padrão, já que o salto de versão do Minecraft é
+bem maior desta vez.
 
 ---
 
