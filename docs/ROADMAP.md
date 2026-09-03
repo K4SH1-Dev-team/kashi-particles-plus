@@ -2,11 +2,12 @@
 
 ## Onde estamos
 
-**v2.0.0** publicado ([Releases](https://github.com/K4SH1-Dev-team/kashi-particles-plus/releases))
+**v2.5.1** publicado ([Releases](https://github.com/K4SH1-Dev-team/kashi-particles-plus/releases))
 — paridade completa com o Snowstorm 3.2.2 para o formato `.particle.json`, endurecido para uso em
-produção em workspaces diferentes da de desenvolvimento, mais escala/duração aditivos e broadcast
-confiável em multiplayer. Desde então, suporte ao gerador NeoForge 1.21.8 (V2.5, ainda não
-versionado numa release). Ver histórico completo abaixo.
+produção em workspaces diferentes da de desenvolvimento, escala/duração aditivos e broadcast
+confiável em multiplayer (v2.0.0), suporte ao gerador NeoForge 1.21.8 lado a lado com o 1.21.1
+(v2.5.0), e duas correções de estabilização descobertas em build real no MCreator (v2.5.1). Ver
+histórico completo abaixo.
 
 ## Próximas fases
 
@@ -79,6 +80,26 @@ versões — só 5 arquivos genuinamente divergem, isolados numa pasta de overla
 Ver [ARCHITECTURE.md](ARCHITECTURE.md) — "Two generators, one shared runtime" para o mecanismo de
 overlay, e [DEVELOPMENT.md](DEVELOPMENT.md) para as duas workspaces de teste
 (`kashi_particle_test` / `teste_vinte_oito`).
+
+#### v2.5.1 — dois bugs reais pegos só no build MCreator/Gradle (concluída)
+
+`check-mod-compile.ps1` (javac puro) não pegou nenhum dos dois — só um build de verdade dentro do
+MCreator revelou:
+
+- **`InvalidReferenceException: input$scale evaluated to null or missing`** em 289 elementos: o
+  MCreator não adiciona retroativamente um input novo (`scale`/`duration`/`dirx`/`diry`/`dirz`) ao
+  XML Blockly de um elemento salvo antes desses inputs existirem. Corrigido com o operador de
+  valor-padrão do FreeMarker (`${input$scale!0}`) nos 3 templates de procedure, nos dois
+  geradores — `0` já significava "sem mudança", então não muda comportamento nenhum para quem já
+  tinha o valor salvo.
+- **Colisão de import**: o formatter de código do próprio MCreator injetou
+  `import net.minecraft.client.sounds.Weighted;` dentro do `KashiParticleDefinition.java`
+  templatizado, colidindo com o nosso próprio `record Weighted` aninhado — só no gerador 1.21.8.
+  Corrigido renomeando o tipo para `WeightedOption`. Ver [CLAUDE.md](CLAUDE.md) — "The traps most
+  worth not re-discovering" para os detalhes e por que isso é invisível ao `check-mod-compile.ps1`.
+
+Testado manualmente pelo usuário nas duas workspaces após a correção: build OK, os 4 modos de
+blend visualmente corretos, broadcast a longa distância confirmado.
 
 ### Fase 4 — Porte para MCreator 2026.2
 Novos geradores: NeoForge 26.1 e 26.2 (o 1.21.8 já foi feito na V2.5 acima). Mesmo mecanismo de
