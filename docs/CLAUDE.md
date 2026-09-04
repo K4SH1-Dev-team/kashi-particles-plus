@@ -147,6 +147,21 @@ Otherwise follow the branch → PR → maintainer-merges workflow in DEVELOPMENT
   caught it. General lesson: a byte-identical procedure copy across generators is only safe once
   actually verified against that generator's real API, same as any other file - "it's just a
   procedure, it can't diverge" is exactly the assumption that broke here.
+- **MCreator silently no-ops a `global_templates` entry whose `.ftl` file doesn't exist in the
+  plugin, instead of failing the build.** Hit for real: `KashiParticleEffects.java.ftl` (the
+  "which effects exist" registry, referenced by every generator's `kashiparticle.definition.yaml`)
+  was never copied into `src/neoforge-26.1.2/`/`src/neoforge-26.2/` at all when those generators
+  were first set up - only `particle.json.ftl` was. The Gradle build compiled clean (the workspace
+  already had a stub `KashiParticleEffects.java` on disk from `sync-core-to-workspace.ps1`'s dev
+  placeholder, and MCreator just never overwrote it), so nothing looked wrong until an actual
+  in-game test found every effect failing to fire with no error anywhere - `KashiParticleRegistry`
+  genuinely had zero effects registered. No tooling in this repo catches a missing template file:
+  `check-mod-compile.ps1` only type-checks `runtime/`, and `build-plugin.ps1` just zips whatever
+  `src/<generator>/` happens to contain. When adding a generator, diff its non-runtime file list
+  (`kashiparticle.definition.yaml`, `procedures/*.java.ftl`, `templates/kashiparticle/*.ftl` at the
+  top level, excluding the auto-generated `templates/kashiparticle/runtime/` subtree) against an
+  existing generator's and confirm every entry has a real counterpart - don't assume a `find`
+  turning up *something* means nothing is missing.
 
 ## Docs
 
