@@ -5,6 +5,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterParticleGroupsEvent;
 import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
+import net.neoforged.neoforge.client.event.RegisterRenderPipelinesEvent;
 
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
@@ -19,15 +20,28 @@ import net.minecraft.util.RandomSource;
  * overloads, because a KASHI effect binds its own texture and does not draw from the particle
  * atlas.
  *
- * <p>This is the NeoForge 26.1.2/26.2 variant of this file - two real differences from 1.21.1/
- * 1.21.8: no {@code bus=} attribute (see {@link KashiParticlesRuntime}), and a new {@code
- * onRegisterGroups} handler. Every earlier generator let {@code getGroup()} (né {@code
- * getRenderType()}) return a fresh, unique value per (texture, blend) and the engine created a
- * matching render batch for each automatically; 26.1.2/26.2 only creates one {@code ParticleGroup}
- * per DISTINCT {@code ParticleRenderType} for the whole game session, from a factory registered
- * once here - so {@link KashiRenderType#GROUP} (the one type every KASHI particle reports) needs
- * exactly one factory registration, not one per effect. See {@link KashiRenderType} and {@link
- * KashiParticleGroup} for where the per-(texture, blend) batching moved to instead.
+ * <p>This is the NeoForge 26.1.2/26.2 variant of this file - real differences from 1.21.1/1.21.8:
+ * no {@code bus=} attribute (see {@link KashiParticlesRuntime}), a new {@code onRegisterGroups}
+ * handler, and a new {@code onRegisterPipelines} handler. Every earlier generator let {@code
+ * getGroup()} (né {@code getRenderType()}) return a fresh, unique value per (texture, blend) and
+ * the engine created a matching render batch for each automatically; 26.1.2/26.2 only creates one
+ * {@code ParticleGroup} per DISTINCT {@code ParticleRenderType} for the whole game session, from a
+ * factory registered once here - so {@link KashiRenderType#GROUP} (the one type every KASHI
+ * particle reports) needs exactly one factory registration, not one per effect. See {@link
+ * KashiRenderType} and {@link KashiParticleGroup} for where the per-(texture, blend) batching moved
+ * to instead.
+ *
+ * <p>{@code onRegisterPipelines} exists because every vanilla particle pipeline on 26.1.2/26.2 goes
+ * through {@code RenderPipelines.register(...)} (visible in the real 26.1.2/26.2 source: {@code
+ * OPAQUE_PARTICLE}/{@code TRANSLUCENT_PARTICLE} are both wrapped in a private {@code register()}
+ * that puts them in {@code PIPELINES_BY_LOCATION}) before the engine ever binds them - and no
+ * vanilla particle uses an additive blend through this API to prove that step is skippable (every
+ * built-in {@code SingleQuadParticle.Layer} constant is {@code OPAQUE} or {@code TRANSLUCENT}, never
+ * additive). {@link KashiRenderType#ADDITIVE_PIPELINE} is the one pipeline KASHI builds itself
+ * rather than reusing a vanilla one, and skipping this step is the one confirmed structural gap
+ * between it and every vanilla pipeline - registering it here, through the same {@code
+ * RegisterRenderPipelinesEvent} vanilla's own {@code registerCustomPipelines()} uses, closes that
+ * gap instead of relying on undocumented lazy-registration behaviour.
  */
 @EventBusSubscriber(modid = KashiParticlesRuntime.MODID, value = Dist.CLIENT)
 public final class KashiParticleClient {
@@ -47,6 +61,11 @@ public final class KashiParticleClient {
 	@SubscribeEvent
 	static void onRegisterGroups(RegisterParticleGroupsEvent event) {
 		event.register(KashiRenderType.GROUP, KashiParticleGroup::new);
+	}
+
+	@SubscribeEvent
+	static void onRegisterPipelines(RegisterRenderPipelinesEvent event) {
+		event.registerPipeline(KashiRenderType.ADDITIVE_PIPELINE);
 	}
 
 	/** Turns a spawn into the invisible emitter particle that drives the effect. */
