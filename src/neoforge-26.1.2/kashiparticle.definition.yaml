@@ -54,7 +54,7 @@ global_templates:
     name: "@SRCROOT/net/kashi/particles/runtime/KashiEventRunner.java"
   - template: kashiparticle/runtime/net/kashi/particles/runtime/KashiDiagnostics.java.ftl
     name: "@SRCROOT/net/kashi/particles/runtime/KashiDiagnostics.java"
-  - template: kashiparticle/runtime/net/kashi/particles/runtime/KashiParticleRenderState.java.ftl
-    name: "@SRCROOT/net/kashi/particles/runtime/KashiParticleRenderState.java"
   - template: kashiparticle/runtime/net/kashi/particles/runtime/KashiParticleGroup.java.ftl
     name: "@SRCROOT/net/kashi/particles/runtime/KashiParticleGroup.java"
+  - template: kashiparticle/runtime/net/kashi/particles/runtime/KashiParticleRenderState.java.ftl
+    name: "@SRCROOT/net/kashi/particles/runtime/KashiParticleRenderState.java"

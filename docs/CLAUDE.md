@@ -162,6 +162,25 @@ Otherwise follow the branch → PR → maintainer-merges workflow in DEVELOPMENT
   top level, excluding the auto-generated `templates/kashiparticle/runtime/` subtree) against an
   existing generator's and confirm every entry has a real counterpart - don't assume a `find`
   turning up *something* means nothing is missing.
+- **26.1.2/26.2's new command-encoder render model will not let you upload a texture while a
+  render pass is open** - confirmed by a real crash, not a guess:
+  `IllegalStateException: Close the existing render pass before performing additional commands`,
+  thrown from inside `TextureManager.getTexture()` the first time a KASHI effect's own texture was
+  ever used, called from `KashiParticleRenderState.render()`/`buildLayer()` - i.e. mid-frame, while
+  the particle render pass was already open. Vanilla's own particle textures never hit this: they
+  come from the pre-stitched atlas, already uploaded at resource-reload time, long before any
+  frame renders, so `getTexture()` there is always a cache hit. A KASHI effect's own loose PNG has
+  no such guarantee. Fixed by forcing the load in `KashiRenderType.of()` instead - which runs
+  during `KashiParticle.extractQuad`, itself part of the "extract" phase that happens before any
+  render pass opens for the frame, not during `render()`/`buildLayer()` itself. `of()` is already
+  cached per texture, so this costs nothing beyond the first particle of each effect.
+- **Editing an overlay's `.java` source is not enough - `make-runtime-templates.ps1` has to run
+  again before `build-plugin.ps1`, every time, no exceptions.** Re-learned the hard way *again*
+  this session (see the `WeightedOption` incident earlier in this file): fixed the texture-preload
+  bug above in `runtime-26.1.2/`/`runtime-26.2/`'s `.java` source, ran `build-plugin.ps1` straight
+  away, and shipped the *old* `.ftl` - `build-plugin.ps1` only zips whatever is already sitting in
+  `src/<generator>/templates/`, it does not regenerate anything. Verify with `unzip -p <zip>
+  <path> | grep <the actual fix>` before telling anyone it's fixed, not just "the build succeeded".
 
 ## Docs
 

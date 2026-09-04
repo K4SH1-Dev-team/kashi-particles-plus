@@ -8,6 +8,7 @@ import com.mojang.blaze3d.platform.BlendFactor;
 import com.mojang.blaze3d.platform.CompareOp;
 
 import net.kashi.particles.core.KashiParticleDefinition.BlendMode;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -75,6 +76,18 @@ public final class KashiRenderType {
 	}
 
 	private static SingleQuadParticle.Layer build(Identifier texture, BlendMode blend) {
+		// Vanilla's own particle textures are always the pre-stitched atlas, already uploaded to
+		// the GPU at resource-reload time, long before any frame renders. A KASHI effect's own
+		// loose PNG has no such guarantee, and this new render model does not allow uploading a
+		// texture while a render pass is open (confirmed for real on 26.1.2: "Close the existing
+		// render pass before performing additional commands", thrown from inside
+		// TextureManager.getTexture() on a texture's first-ever use, mid-render). of() runs during
+		// the "extract" phase (KashiParticle.extractQuad, called before any render pass opens for
+		// the frame - see KashiParticleGroup), so forcing the load here, once per distinct texture
+		// (cached by the CACHE map in of()), guarantees it is already resident by the time anything
+		// tries to bind it.
+		Minecraft.getInstance().getTextureManager().getTexture(texture);
+
 		RenderPipeline pipeline = switch (blend) {
 			// particles_alpha and particles_opaque are alpha *tested*, not blended: with no blend
 			// pipeline, the vanilla particle shader's own "discard below 0.1 alpha" is the whole
