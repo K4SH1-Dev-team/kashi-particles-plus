@@ -1,11 +1,14 @@
-# Type-checks the mod-side runtime WITHOUT gradle, for every generator this plugin supports.
+# Type-checks the mod-side runtime WITHOUT invoking a real gradle build, for every generator this
+# plugin supports.
 #
 # gradle's neoform step is heavy and, on this network drive with the workspace's 1 GB heap, prone
-# to stalling. But the compile classpath already exists on disk: the moddev "merged" jar holds all
-# of Minecraft + the NeoForge API, and every other dependency (FML loader, joml, brigadier,
-# DataFixerUpper, gson, netty) is listed in the workspace's own build/moddev/
-# clientLegacyClasspath.txt, which Gradle already resolved. Point javac at all of them and we get
-# compile errors in seconds, no daemon involved.
+# to stalling, so this avoids repeating it. Older generators (neoforge-1.21.1, neoforge-1.21.8)
+# already have their full compile classpath sitting on disk after one MCreator build - the moddev
+# "merged" jar plus build/moddev/clientLegacyClasspath.txt - so those are just read directly.
+# Newer ones (neoforge-26.1.2, neoforge-26.2) don't write that file at all; for those the
+# classpath is resolved by actually asking Gradle once (see ClasspathMode below and
+# kashi-print-classpath.init.gradle), then cached on disk so every check after the first is still
+# just javac, no daemon involved.
 #
 # This does NOT produce a runnable mod - it only checks that the code compiles against the real
 # API. Building and running still goes through MCreator.
@@ -27,11 +30,20 @@ $installs = @{
 }
 
 # One entry per test workspace - same list as sync-core-to-workspace.ps1, plus which install's
-# JDK to type-check it with. "Label" is only for the summary line.
+# JDK to type-check it with. "Label" is only for the summary line. "ClasspathMode" picks how the
+# rest of the classpath (beyond the merged/patched Minecraft jar) is found:
+#   "legacy" - read the workspace's own build/moddev/clientLegacyClasspath.txt, which
+#              neoforge-1.21.1/neoforge-1.21.8's older moddev Gradle plugin writes to disk.
+#   "gradle" - that file does not exist for neoforge-26.1.2/neoforge-26.2 (their newer moddev
+#              plugin resolves the classpath without ever writing it anywhere) - resolved instead
+#              by actually asking Gradle, once, via kashi-print-classpath.init.gradle. See that
+#              file for why it needs --no-configuration-cache and can't just be a normal task.
 $workspaces = @(
-    [pscustomobject]@{ Name = "kashi_particle_test"; Label = "NeoForge 1.21.1 (MCreator 2026.1)"; Install = "2026.1" },
-    [pscustomobject]@{ Name = "teste_vinte_oito";    Label = "NeoForge 1.21.8 (MCreator 2026.1)"; Install = "2026.1" },
-    [pscustomobject]@{ Name = "true_particle_test";  Label = "NeoForge 1.21.1 (MCreator 2026.2)"; Install = "2026.2" }
+    [pscustomobject]@{ Name = "kashi_particle_test"; Label = "NeoForge 1.21.1 (MCreator 2026.1)"; Install = "2026.1"; ClasspathMode = "legacy" },
+    [pscustomobject]@{ Name = "teste_vinte_oito";    Label = "NeoForge 1.21.8 (MCreator 2026.1)"; Install = "2026.1"; ClasspathMode = "legacy" },
+    [pscustomobject]@{ Name = "true_particle_test";  Label = "NeoForge 1.21.1 (MCreator 2026.2)"; Install = "2026.2"; ClasspathMode = "legacy" },
+    [pscustomobject]@{ Name = "seis_um";             Label = "NeoForge 26.1.2 (MCreator 2026.2)"; Install = "2026.2"; ClasspathMode = "gradle" },
+    [pscustomobject]@{ Name = "seis_dois";           Label = "NeoForge 26.2 (MCreator 2026.2)";   Install = "2026.2"; ClasspathMode = "gradle" }
 )
 
 $overallCode = 0
@@ -51,33 +63,72 @@ foreach ($ws in $workspaces) {
 
     $out = Join-Path $env:TEMP "kashi-modcheck-$($ws.Name)"
 
-    # The merged jar is authoritative for Minecraft + NeoForge classes; everything else fills in
-    # the library dependencies. Matched by pattern rather than a hardcoded version, since the
-    # exact NeoForge build number is whatever the workspace's generator resolved and moves
-    # independently of this script.
-    $artifactsDir = Join-Path $workspace "build\moddev\artifacts"
-    $merged = Get-ChildItem $artifactsDir -Filter "neoforge-*-merged.jar" -EA SilentlyContinue |
-              Select-Object -First 1
+    if ($ws.ClasspathMode -eq "gradle") {
+        # neoforge-26.1.2/neoforge-26.2's moddev plugin never writes a classpath file to disk (see
+        # kashi-print-classpath.init.gradle) - and unlike the legacy mode below, the resolved
+        # compileClasspath it hands back already includes the correct Minecraft+NeoForge jar
+        # itself (build/moddev/artifacts/minecraft-patched-<version>.jar - NOT the same file as
+        # the similarly-named "-merged.jar", which is bigger and meant for running the game, not
+        # compiling against it). No separate merged-jar step needed for this mode.
+        $resolvedFile = Join-Path $workspace "build\moddev\kashiResolvedClasspath.txt"
 
-    if (-not $merged) {
-        throw "[$($ws.Name)] merged jar not found under $artifactsDir - open/build the workspace in MCreator once first"
+        if (-not (Test-Path $resolvedFile)) {
+            Write-Host "[$($ws.Name)] no cached classpath - resolving via gradle (one-off; slower than the other workspaces)..."
+
+            $gradlew = Join-Path $workspace "gradlew.bat"
+            if (-not (Test-Path $gradlew)) { throw "[$($ws.Name)] $gradlew not found" }
+
+            $initScript = Join-Path $PSScriptRoot "kashi-print-classpath.init.gradle"
+            $previousJavaHome = $env:JAVA_HOME
+            $env:JAVA_HOME = $mcreator + "\jdk"
+
+            Push-Location $workspace
+            try {
+                & $gradlew --init-script $initScript "-DkashiOut=$resolvedFile" help -q --no-configuration-cache
+                $gradleCode = $LASTEXITCODE
+            } finally {
+                Pop-Location
+                $env:JAVA_HOME = $previousJavaHome
+            }
+
+            if ($gradleCode -ne 0 -or -not (Test-Path $resolvedFile)) {
+                throw "[$($ws.Name)] gradle classpath resolution failed (exit $gradleCode) - see output above"
+            }
+        }
+
+        $deps = Get-Content $resolvedFile
+        $classpath = $deps -join ";"
+        $jarLabel = "$($deps.Count) jars (gradle-resolved)"
+    } else {
+        # The merged jar is authoritative for Minecraft + NeoForge classes; everything else fills
+        # in the library dependencies. Matched by pattern rather than a hardcoded version, since
+        # the exact NeoForge build number is whatever the workspace's generator resolved and moves
+        # independently of this script.
+        $artifactsDir = Join-Path $workspace "build\moddev\artifacts"
+        $merged = Get-ChildItem $artifactsDir -Filter "neoforge-*-merged.jar" -EA SilentlyContinue |
+                  Select-Object -First 1
+
+        if (-not $merged) {
+            throw "[$($ws.Name)] merged jar not found under $artifactsDir - open/build the workspace in MCreator once first"
+        }
+
+        # The rest of the classpath (FML loader, joml, brigadier, DataFixerUpper, gson, netty, ...)
+        # is read from this workspace's OWN Gradle-resolved classpath, not scanned from the shared
+        # ~/.mcreator/gradle module cache directly. Test workspaces share that cache (see
+        # docs/DEVELOPMENT.md), so once a second NeoForge version had been downloaded into it, a
+        # blind scan picked up two different versions of some libraries (fastutil, notably) and
+        # javac resolved symbols against the wrong one - "cannot find symbol" for methods that do
+        # exist, just not in the jar javac happened to pick first. This file is what Gradle itself
+        # resolved for this exact workspace, so it cannot have that problem.
+        $classpathFile = Join-Path $workspace "build\moddev\clientLegacyClasspath.txt"
+        if (-not (Test-Path $classpathFile)) {
+            throw "[$($ws.Name)] $classpathFile not found - open/build the workspace in MCreator once first"
+        }
+
+        $deps = Get-Content $classpathFile
+        $classpath = (@($merged.FullName) + $deps) -join ";"
+        $jarLabel = "$($deps.Count + 1) jars ($($merged.Name))"
     }
-
-    # The rest of the classpath (FML loader, joml, brigadier, DataFixerUpper, gson, netty, ...) is
-    # read from this workspace's OWN Gradle-resolved classpath, not scanned from the shared
-    # ~/.mcreator/gradle module cache directly. Both test workspaces share that cache (see
-    # docs/DEVELOPMENT.md), so once a second NeoForge version had been downloaded into it, a blind
-    # scan picked up two different versions of some libraries (fastutil, notably) and javac
-    # resolved symbols against the wrong one - "cannot find symbol" for methods that do exist, just
-    # not in the jar javac happened to pick first. This file is what Gradle itself resolved for
-    # this exact workspace, so it cannot have that problem.
-    $classpathFile = Join-Path $workspace "build\moddev\clientLegacyClasspath.txt"
-    if (-not (Test-Path $classpathFile)) {
-        throw "[$($ws.Name)] $classpathFile not found - open/build the workspace in MCreator once first"
-    }
-
-    $deps = Get-Content $classpathFile
-    $classpath = (@($merged.FullName) + $deps) -join ";"
 
     if (Test-Path $out) { Remove-Item $out -Recurse -Force }
     New-Item -ItemType Directory -Path $out -Force | Out-Null
@@ -85,7 +136,7 @@ foreach ($ws in $workspaces) {
     $sources = Get-ChildItem (Join-Path $workspace "src\main\java\net\kashi") -Recurse -Filter "*.java" |
                ForEach-Object { $_.FullName }
 
-    Write-Host "[$($ws.Name)] type-checking $($sources.Count) files against $($deps.Count + 1) jars ($($merged.Name))..."
+    Write-Host "[$($ws.Name)] type-checking $($sources.Count) files against $jarLabel..."
 
     # An @argfile, not a direct command line: with two workspaces sharing one gradle cache (see
     # docs/DEVELOPMENT.md), that cache now holds both NeoForge versions' dependencies, and

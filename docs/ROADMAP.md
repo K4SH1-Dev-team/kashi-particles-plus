@@ -128,12 +128,42 @@ Maior que a V2.5: aqui mudam duas coisas ao mesmo tempo — o aplicativo MCreato
 - `generator-addon-26.1x` identificado e descartado do escopo — é um gerador **Bedrock Edition**
   (behavior/resource pack), não Java/NeoForge.
 
-**Pendente (Etapa B)**: usuário precisa criar, dentro do MCreator 2026.2, uma workspace de teste
-por gerador novo (`neoforge-26.1.2` e `neoforge-26.2`, mesmo processo que gerou a `teste_vinte_oito`
-antes da V2.5) e buildar cada uma pelo menos uma vez, pra então investigar a API real de cada uma
-(merged jar, `javap`/leitura de fonte) e estender o mecanismo de overlay conforme o que for
-encontrado — sem herdar conclusões do `1.21.8` por padrão, já que o salto de versão do Minecraft é
-bem maior desta vez.
+**Etapa B concluída** — usuário criou as duas workspaces novas (`seis_um` = `neoforge-26.1.2`,
+`seis_dois` = `neoforge-26.2`) e buildou cada uma no MCreator; a partir dos merged jars reais
+(`javap`/leitura de fonte, nunca suposição), a API confirmada divergir de verdade foi bem maior que
+o salto do 1.21.8 — quase todo `runtime/` precisou de overlay, não só 2-3 arquivos:
+
+- `ResourceLocation` renomeada pra `Identifier` (mesma API, só o nome) — afeta quase todo arquivo
+  que toca um id de efeito ou textura.
+- `@EventBusSubscriber(bus = ...)` removido (igual ao 1.21.8), `Level.random` virou `protected`
+  (`getRandom()`), `Camera.getPosition()` virou `Camera.position()`.
+- **O pipeline de render de partículas foi reconstruído** em torno de "extrai os dados do frame,
+  desenha depois" em vez de "cada partícula desenha a si mesma num `VertexConsumer`" —
+  `Particle.render(...)` não existe mais. `KashiParticle` ganhou dois arquivos sem equivalente no
+  1.21.x, `KashiParticleGroup.java` e `KashiParticleRenderState.java`, registrados uma vez (não por
+  efeito) via `RegisterParticleGroupsEvent` da NeoForge — reimplementando o próprio padrão de
+  batching por (textura, blend) que o vanilla usa (`SingleQuadParticle`/`QuadParticleRenderState`),
+  mas com largura/altura independentes (o vanilla só guarda um `scale` único por partícula — um
+  KASHI particle tem `size.x`/`size.y` autorados separadamente).
+- **`26.1.2` e `26.2` nem concordam entre si** nessa mesma API — confirmado comparando os dois jars
+  reais, não suposto de um pro outro — por isso viraram dois overlays separados
+  (`runtime-26.1.2/`, `runtime-26.2/`) em vez de compartilhado. `26.1.2` exige implementar
+  `SubmitNodeCollector.ParticleGroupRenderer` (monta os buffers de GPU na mão); `26.2` simplificou
+  pra um `buildLayer(Layer, VertexConsumer)` direto, mas exige que a classe seja literalmente uma
+  subclasse de `QuadParticleRenderState` (o método que a recebe é tipado pra classe concreta, não
+  uma interface).
+- `Particle.getRenderBoundingBox` (a caixa de frustum culling customizada) também sumiu — culling
+  agora é decisão de cada `ParticleGroup`. `KashiParticleGroup` usa `Frustum.isVisible(AABB)` contra
+  uma caixa que `KashiParticle` ainda calcula do jeito antigo, pra não reintroduzir silenciosamente
+  o bug de culling que aquele método existia pra corrigir.
+- `neoforge-26.1.2`/`neoforge-26.2` não escrevem `clientLegacyClasspath.txt` — `check-mod-compile.ps1`
+  resolve o classpath rodando o Gradle uma vez (`tools/kashi-print-classpath.init.gradle`), com
+  cache em disco depois disso.
+
+Resultado: as cinco workspaces (`kashi_particle_test`, `teste_vinte_oito`, `true_particle_test`,
+`seis_um`, `seis_dois`) compilam limpo via `check-mod-compile.ps1`, e `run-core-tests.ps1` passa
+sob os dois JDKs. Falta o teste real do usuário (build Gradle de verdade nas 5 workspaces + os 4
+modos de blend visualmente, nas 4 que renderizam) antes da release.
 
 ---
 

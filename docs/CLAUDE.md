@@ -23,18 +23,21 @@ Otherwise follow the branch → PR → maintainer-merges workflow in DEVELOPMENT
   MCreator/Minecraft dependency. Compiled directly into the plugin *and* templated into every
   generated mod (see ARCHITECTURE.md — "The generation pipeline").
 - `runtime/` — the mod-side particle engine (spawn/tick/render, render types, debug command).
-  Templated into every generated mod almost verbatim; never compiled into the plugin itself. Two
-  generators share this one tree; a handful of files that genuinely differ between them live in
-  `runtime-1.21.8/` instead of a second copy of the whole thing — see ARCHITECTURE.md — "Two
-  generators, one shared runtime".
+  Templated into every generated mod almost verbatim; never compiled into the plugin itself. Four
+  generators share this one tree; files that genuinely differ between them live in a per-generator
+  overlay (`runtime-1.21.8/`, `runtime-26.1.2/`, `runtime-26.2/`) instead of a second copy of the
+  whole thing — see ARCHITECTURE.md — "Four generators, one shared runtime".
 - `src/` — the actual MCreator plugin payload (`plugin.json`, lang strings, each generator's own
-  `neoforge-1.21.1`/`neoforge-1.21.8` templates/definition, procedure block definitions, themes).
+  (`neoforge-1.21.1`/`neoforge-1.21.8`/`neoforge-26.1.2`/`neoforge-26.2`) templates/definition,
+  procedure block definitions, themes).
 - `src-java/` — the plugin's own Java: the mod element type, its wizard GUI, plugin entry point.
-  Compiled against `mcreator.exe` (MCreator's classes live inside the exe, not in a `lib/` jar —
-  see DEVELOPMENT.md).
+  Compiled against **every supported MCreator install's own** `mcreator.exe` separately (MCreator's
+  classes live inside the exe, not in a `lib/` jar — see DEVELOPMENT.md) — two MCreator
+  *applications* now, not just four generators.
 - `tools/` — every dev script: build pipeline, batch validation, dev-only import helpers.
-  Resolves the local-only dev environment (MCreator install, test workspaces) as
-  `../local/mcreator` and `../local/workspace/...` relative to this repo — see
+  Resolves the local-only dev environment (both MCreator installs, test workspaces) as
+  `../local/mcreator`, `../local/02 - MCreator20262` and `../local/workspace/...` relative to
+  this repo — see
   DEVELOPMENT.md for the full layout and why.
 
 ## The traps most worth not re-discovering
@@ -108,6 +111,31 @@ Otherwise follow the branch → PR → maintainer-merges workflow in DEVELOPMENT
   this plugin, which only ever generates Java/NeoForge mods. Confirmed by its own `plugin.json`
   name. Don't confuse it with `generator-26.1.x.zip` (the actual NeoForge Java generator this
   plugin targets).
+- **A workspace's real generator id is not its MCreator plugin zip's name.** `generator-26.1.x.zip`
+  and `generator-26.2.x.zip` are just filenames; the actual ids `src/<generator>/` has to match are
+  `neoforge-26.1.2` and `neoforge-26.2` (confirmed both from each zip's own internal folder name
+  and from a real workspace's `currentGenerator` field - same rule that already applied to
+  `neoforge-1.21.8`, easy to re-forget under a new pair of numbers).
+- **26.1.2 and 26.2 do not share one real API, even though their generator ids look adjacent** -
+  confirmed by diffing both real jars, never assumed one from the other. The particle
+  render-state API in particular is a different shape between them (see ARCHITECTURE.md), which is
+  why they get two separate overlays (`runtime-26.1.2/`, `runtime-26.2/`) instead of one shared
+  between them the way 1.21.1/1.21.8 mostly do.
+- **`neoforge-26.1.2`/`neoforge-26.2`'s moddev Gradle plugin writes no classpath file to disk at
+  all** (unlike `neoforge-1.21.1`/`neoforge-1.21.8`'s `clientLegacyClasspath.txt`) - `build/
+  moddev/` only has run-arg files, no dependency list anywhere. `check-mod-compile.ps1` resolves it
+  instead by actually running Gradle once, via `tools/kashi-print-classpath.init.gradle` - see that
+  file's comments for two easy-to-lose requirements (`--no-configuration-cache`, and capturing the
+  classpath in `afterEvaluate` rather than inside a task action, which the configuration cache
+  forbids even when the rest of the build ignores the cache).
+- **`Particle`'s `roll`/`oRoll` fields and its `getRenderBoundingBox` hook are both gone as of
+  26.1.2/26.2** (confirmed against the real source, not assumed from 1.21.8, where both still
+  exist) - the fields only survive on `SingleQuadParticle`, which `KashiParticle` deliberately does
+  not extend (see ARCHITECTURE.md for why), so it now declares its own `roll`/`oRoll`; and culling
+  moved from "the particle provides a box" to "the `ParticleGroup` decides for itself" - see
+  `KashiParticleGroup.extractRenderState`/`KashiParticle.cullBox()` for the replacement, which
+  exists specifically to avoid quietly reintroducing the large-quad culling bug `getRenderBoundingBox`
+  was originally written to fix.
 
 ## Docs
 

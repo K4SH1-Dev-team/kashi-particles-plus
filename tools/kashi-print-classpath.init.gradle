@@ -1,0 +1,32 @@
+// Used only by tools/check-mod-compile.ps1, for generators whose moddev Gradle plugin does not
+// write a clientLegacyClasspath.txt to disk the way neoforge-1.21.1/neoforge-1.21.8's does
+// (confirmed for neoforge-26.1.2/neoforge-26.2 - build/moddev/ has no classpath file of any kind
+// there, just run-arg files with no dependency list). This resolves the real compileClasspath
+// Gradle itself would use and writes it, one absolute path per line, to -DkashiOut=<file>.
+//
+// Two things this needs that are easy to lose again if this file is ever "simplified":
+//
+// - Must run with --no-configuration-cache. With the configuration cache warm (every workspace
+//   here has org.gradle.configuration-cache=true in gradle.properties), Gradle skips project
+//   evaluation entirely and reuses a cached task graph - so this script's afterEvaluate hook
+//   would silently never run and the output file would just be stale or missing, with no error.
+// - The classpath must be captured as plain, already-resolved data (a List<String> built and
+//   written to disk inside afterEvaluate) rather than read lazily inside a task action. A
+//   registered task's doLast body runs UNDER the configuration cache's execution-time
+//   restrictions even when the rest of the build ignores the cache, and referencing `project` (or
+//   anything holding one, like a SourceSet) from there throws
+//   "invocation of 'Task.project' ... is unsupported with the configuration cache". Doing the work
+//   in afterEvaluate, before the configuration phase ends, sidesteps that restriction entirely -
+//   which is also why no task actually needs to run; `gradlew ... help` is enough to trigger it.
+allprojects { p ->
+    p.afterEvaluate {
+        try {
+            def cp = p.sourceSets.main.compileClasspath.files.collect { it.absolutePath }
+            def outFile = new File(System.getProperty("kashiOut", "kashi-classpath.txt"))
+            outFile.text = cp.join(System.lineSeparator())
+            println "KASHI_CLASSPATH_ENTRIES=" + cp.size()
+        } catch (Exception e) {
+            println "KASHI_CLASSPATH_ERROR=" + e.toString()
+        }
+    }
+}
