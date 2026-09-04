@@ -59,8 +59,11 @@ public final class KashiRenderType {
 	 * alpha-weighted, which would draw a near-transparent particle at full brightness. Bedrock's
 	 * {@code particles_add} material needs (SRC_ALPHA, ONE) instead, built once and shared by every
 	 * KASHI effect that uses {@code ADD} - depth write off, or an additive particle would occlude
-	 * the ones behind it and the glow would stop accumulating. */
-	private static final RenderPipeline ADDITIVE_PIPELINE =
+	 * the ones behind it and the glow would stop accumulating.
+	 *
+	 * <p>Package-private, not private: {@link KashiParticleClient#onRegisterPipelines} needs to hand
+	 * this to {@code RegisterRenderPipelinesEvent} - see that method for why. */
+	static final RenderPipeline ADDITIVE_PIPELINE =
 			RenderPipeline.builder(RenderPipelines.PARTICLE_SNIPPET)
 					.withLocation("kashi/pipeline/additive_particle")
 					.withColorTargetState(new ColorTargetState(new BlendFunction(SourceFactor.SRC_ALPHA, DestFactor.ONE)))
