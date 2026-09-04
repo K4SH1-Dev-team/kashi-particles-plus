@@ -137,6 +137,17 @@ Otherwise follow the branch → PR → maintainer-merges workflow in DEVELOPMENT
   exists specifically to avoid quietly reintroducing the large-quad culling bug `getRenderBoundingBox`
   was originally written to fix.
 
+- **`check-mod-compile.ps1` never sees `src/<generator>/procedures/*.java.ftl` at all** - it only
+  type-checks the workspace's copy of `runtime/`, not the procedure templates MCreator expands
+  into a workspace's generated `*Procedure.java` files. Hit for real: `26.1.2`/`26.2`'s procedure
+  templates were copied byte-identical from 1.21.1 on the assumption that "procedures only touch
+  APIs that never diverged" - true for 1.21.8, false here, since they fully-qualify
+  `net.minecraft.resources.ResourceLocation` (renamed to `Identifier`, see above) and a procedure
+  has no imports to catch that at template-authoring time. Only a real MCreator/Gradle build
+  caught it. General lesson: a byte-identical procedure copy across generators is only safe once
+  actually verified against that generator's real API, same as any other file - "it's just a
+  procedure, it can't diverge" is exactly the assumption that broke here.
+
 ## Docs
 
 - [USAGE.md](USAGE.md) — for someone using the plugin to build a mod.
