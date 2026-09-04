@@ -177,9 +177,17 @@ real `minecraft-patched-*.jar`/`-sources.jar` (never assumed from the other):
     (`KashiParticleClient.java` - accepted, not currently used).
 
 Every generator's procedure templates (`src/<generator>/procedures/*.java.ftl`) and the two
-non-runtime templates (`particle.json.ftl`, `KashiParticleEffects.java.ftl`) are, by contrast,
-identical byte-for-byte across all four - they only touch APIs that never diverged - so those are
-plain copies, not generated, and only need updating in every place if one is ever edited.
+non-runtime templates (`particle.json.ftl`, `KashiParticleEffects.java.ftl`) are plain copies, not
+generated - but **not quite identical byte-for-byte across all four any more.** They were for
+1.21.1/1.21.8 (neither touches anything that diverged between those two), and `26.1.2`/`26.2`
+started as byte-identical copies of 1.21.1's on the same assumption - wrongly: all three procedure
+templates construct the effect id via `net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(...)`,
+fully-qualified (procedures have no imports of their own), and `ResourceLocation` is exactly the
+class that got renamed to `Identifier` for 26.1.2/26.2 (see above) - caught by a real Gradle build,
+not `check-mod-compile.ps1` (which only type-checks `runtime/`, never the procedure templates
+MCreator itself expands). Fixed by updating that one fully-qualified name in the `26.1.2`/`26.2`
+copies; they otherwise still match 1.21.1's procedures line for line, so keep updating all four in
+step for anything else - just remember the effect-id line is the one place they now differ.
 
 ## Resolving which effect a procedure fires
 
