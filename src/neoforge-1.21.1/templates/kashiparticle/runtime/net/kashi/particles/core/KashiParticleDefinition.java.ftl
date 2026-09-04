@@ -101,13 +101,13 @@ public record KashiParticleDefinition(
 
 		record Sequence(List<EventNode> nodes) implements EventNode {}
 
-		record Randomize(List<Weighted> options) implements EventNode {}
+		record Randomize(List<WeightedOption> options) implements EventNode {}
 
 		/** {@code log} — a debug print in Bedrock. Kept so it round-trips, never acted on. */
 		record Log(String message) implements EventNode {}
 	}
 
-	public record Weighted(double weight, EventNode node) {}
+	public record WeightedOption(double weight, EventNode node) {}
 
 	/**
 	 * Where a spawned effect is placed and whether it is tied to what spawned it.
@@ -164,7 +164,7 @@ public record KashiParticleDefinition(
 				}
 				case EventNode.Sequence sequence -> collectEffects(sequence.nodes(), into);
 				case EventNode.Randomize randomize -> collectEffects(
-						randomize.options().stream().map(Weighted::node).toList(), into);
+						randomize.options().stream().map(WeightedOption::node).toList(), into);
 				default -> { }
 			}
 		}
@@ -516,14 +516,14 @@ public record KashiParticleDefinition(
 			if (!element.isJsonArray())
 				throw new KashiParticleParseException(path + ".randomize", "expected an array of options");
 
-			List<Weighted> options = new ArrayList<>();
+			List<WeightedOption> options = new ArrayList<>();
 			JsonArray array = element.getAsJsonArray();
 
 			for (int i = 0; i < array.size(); i++) {
 				String optionPath = path + ".randomize[" + i + "]";
 				JsonObject option = asObj(array.get(i), optionPath);
 
-				options.add(new Weighted(number(option, "weight", optionPath + ".weight", 1),
+				options.add(new WeightedOption(number(option, "weight", optionPath + ".weight", 1),
 						eventNode(option, optionPath)));
 			}
 
@@ -995,7 +995,7 @@ public record KashiParticleDefinition(
 					case EventNode.Sound sound -> sounds.add(sound.eventName());
 					case EventNode.Sequence sequence -> sounds.addAll(soundEvents(sequence.nodes()));
 					case EventNode.Randomize randomize -> sounds.addAll(soundEvents(
-							randomize.options().stream().map(Weighted::node).toList()));
+							randomize.options().stream().map(WeightedOption::node).toList()));
 					default -> { }
 				}
 			}

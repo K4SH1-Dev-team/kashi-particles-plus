@@ -24,7 +24,9 @@ $localRoot = Join-Path (Split-Path -Parent $project) "local"
 $workspaces = @(
     [pscustomobject]@{ Name = "kashi_particle_test"; Overlay = $null },
     [pscustomobject]@{ Name = "teste_vinte_oito";    Overlay = "runtime-1.21.8" },
-    [pscustomobject]@{ Name = "true_particle_test";  Overlay = $null }
+    [pscustomobject]@{ Name = "true_particle_test";  Overlay = $null },
+    [pscustomobject]@{ Name = "seis_um";             Overlay = "runtime-26.1.2" },
+    [pscustomobject]@{ Name = "seis_dois";           Overlay = "runtime-26.2" }
 )
 
 foreach ($ws in $workspaces) {

@@ -56,7 +56,9 @@ version control:
     └── workspace/
         ├── kashi_particle_test/   <- dev/test workspace, NeoForge 1.21.1, MCreator 2026.1
         ├── teste_vinte_oito/      <- dev/test workspace, NeoForge 1.21.8, MCreator 2026.1
-        └── true_particle_test/    <- dev/test workspace, NeoForge 1.21.1, MCreator 2026.2
+        ├── true_particle_test/    <- dev/test workspace, NeoForge 1.21.1, MCreator 2026.2
+        ├── seis_um/               <- dev/test workspace, NeoForge 26.1.2, MCreator 2026.2
+        └── seis_dois/             <- dev/test workspace, NeoForge 26.2, MCreator 2026.2
 ```
 
 - **Two local MCreator installs, each fully isolated** (`mcreator.exe` directly inside it, own
@@ -76,6 +78,17 @@ version control:
   its MCreator at least once first, so its Gradle moddev "merged" jar and resolved classpath exist
   on disk. If you only work on one generator day-to-day, the other workspaces can be left as-is -
   both scripts skip a workspace folder that doesn't exist.
+  - `neoforge-1.21.1`/`neoforge-1.21.8` write their classpath to `build/moddev/
+    clientLegacyClasspath.txt` after one MCreator build - `check-mod-compile.ps1` just reads it
+    (`ClasspathMode = "legacy"`).
+  - `neoforge-26.1.2`/`neoforge-26.2`'s newer moddev Gradle plugin does not write that file at all
+    (`ClasspathMode = "gradle"`) - `check-mod-compile.ps1` resolves it instead by actually running
+    Gradle once (`gradlew --init-script tools/kashi-print-classpath.init.gradle ... help`, with
+    `JAVA_HOME` pointed at that workspace's own install), caching the result at `build/moddev/
+    kashiResolvedClasspath.txt` so every check after the first is still pure `javac`. See that
+    `.gradle` file's own comments for two non-obvious things it needs
+    (`--no-configuration-cache`, and why the classpath has to be captured in `afterEvaluate` rather
+    than inside a task action).
 - PowerShell and Python 3 with `numpy` (only needed for `optimize-textures.py`, which is offline
   tooling, not part of the shipped runtime).
 
