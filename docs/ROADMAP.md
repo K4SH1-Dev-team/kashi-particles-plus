@@ -2,12 +2,13 @@
 
 ## Onde estamos
 
-**v2.5.1** publicado ([Releases](https://github.com/K4SH1-Dev-team/kashi-particles-plus/releases))
+**v3.0.0** publicado ([Releases](https://github.com/K4SH1-Dev-team/kashi-particles-plus/releases))
 — paridade completa com o Snowstorm 3.2.2 para o formato `.particle.json`, endurecido para uso em
 produção em workspaces diferentes da de desenvolvimento, escala/duração aditivos e broadcast
 confiável em multiplayer (v2.0.0), suporte ao gerador NeoForge 1.21.8 lado a lado com o 1.21.1
-(v2.5.0), e duas correções de estabilização descobertas em build real no MCreator (v2.5.1). Ver
-histórico completo abaixo.
+(v2.5.0), duas correções de estabilização descobertas em build real no MCreator (v2.5.1), e porte
+completo para o MCreator 2026.2 com suporte a **dois novos geradores** (NeoForge 26.1.2 e 26.2)
+lado a lado com o 1.21.1/1.21.8 (v3.0.0). Ver histórico completo abaixo.
 
 ## Próximas fases
 
@@ -101,7 +102,7 @@ MCreator revelou:
 Testado manualmente pelo usuário nas duas workspaces após a correção: build OK, os 4 modos de
 blend visualmente corretos, broadcast a longa distância confirmado.
 
-### Fase 4 / V3.0.0 — Porte para MCreator 2026.2 (em andamento)
+### Fase 4 / V3.0.0 — Porte para MCreator 2026.2 (concluída)
 Maior que a V2.5: aqui mudam duas coisas ao mesmo tempo — o aplicativo MCreator em si (2026.1 →
 2026.2, com sua própria API de plugin) e a API Minecraft/NeoForge por trás de dois geradores novos
 (`neoforge-26.1.2` e `neoforge-26.2`; o `1.21.8` já foi feito na V2.5 acima). Matriz final: MCreator
@@ -194,8 +195,10 @@ Mesmo padrão da v2.5.1 acima — `check-mod-compile.ps1` não pegou nenhum dos 
   profundidade correta, cada quad aditivo ficava se somando por cima do outro sem limite. Corrigido
   trocando pra `GREATER_THAN_OR_EQUAL` só no arquivo do `26.2`. Ver [CLAUDE.md](CLAUDE.md).
 
-Falta o teste real do usuário (build Gradle de verdade nas 5 workspaces + os 4 modos de blend
-visualmente, nas 4 que renderizam) antes da release.
+Testado pelo usuário nas 5 workspaces com build Gradle real: `kashi_particle_test`, `teste_vinte_oito`
+e `true_particle_test` (1.21.1/1.21.8, já validados na v2.5/v2.5.1) e `seis_um`/`seis_dois`
+(26.1.2/26.2, novos) — os 4 modos de blend (ADD/ALPHA/CUTOUT — não existe exemplo OPAQUE no pack
+de prova) corretos nas 5.
 
 ---
 
