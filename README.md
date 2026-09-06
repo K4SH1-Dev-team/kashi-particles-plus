@@ -17,8 +17,9 @@ engine.
 
 ## Status
 
-**v2.5.1** — production-ready. Targets **MCreator 2026.1.x**, with either the **NeoForge 1.21.1**
-or **NeoForge 1.21.8** generator (see [docs/ROADMAP.md](docs/ROADMAP.md) for what's next).
+**v3.0.0** — production-ready. Targets **MCreator 2026.1.x** (NeoForge **1.21.1** or **1.21.8**) or
+**MCreator 2026.2.x** (NeoForge **1.21.1**, **26.1.2** or **26.2**) - see
+[docs/ROADMAP.md](docs/ROADMAP.md) for what's next.
 
 ## Features
 
@@ -50,7 +51,8 @@ or **NeoForge 1.21.8** generator (see [docs/ROADMAP.md](docs/ROADMAP.md) for wha
 
 ## Requirements
 
-- MCreator 2026.1.x, with the **NeoForge 1.21.1** or **NeoForge 1.21.8** generator.
+- MCreator 2026.1.x, with the **NeoForge 1.21.1** or **NeoForge 1.21.8** generator - or MCreator
+  2026.2.x, with **NeoForge 1.21.1**, **26.1.2** or **26.2**.
 - Java plugins enabled in MCreator's preferences (MCreator → Preferences → enable Java plugin
   support, if not already on).
 
@@ -59,8 +61,8 @@ or **NeoForge 1.21.8** generator (see [docs/ROADMAP.md](docs/ROADMAP.md) for wha
 1. Download `kashi_particles_plus.zip` from [Releases](../../releases).
 2. Drop it into your MCreator plugins folder (`.mcreator/plugins/` under your user profile).
 3. Restart MCreator.
-4. In a NeoForge 1.21.1 or 1.21.8 workspace, **Mod element → New mod element → KASHI Particle**
-   should now be available.
+4. In a NeoForge 1.21.1, 1.21.8, 26.1.2 or 26.2 workspace, **Mod element → New mod element →
+   KASHI Particle** should now be available.
 
 ## Usage
 

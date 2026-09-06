@@ -8,7 +8,7 @@
     ],
     "info": {
         "name": "KASHI Particles Plus",
-        "version": "2.5.1",
+        "version": "3.0.0",
         "description": "Importa efeitos .particle.json do Snowstorm (formato de particulas do Minecraft Bedrock) e os reproduz com fidelidade em mods Java NeoForge, atraves do elemento de mod 'KASHI Particle' e de blocos de procedure que apenas disparam a particula - duracao, animacao e aparencia vem prontas do JSON. Motor MoLang proprio, sem dependencia de GeckoLib.",
         "author": "Kashi's (Wesley)"
     }
