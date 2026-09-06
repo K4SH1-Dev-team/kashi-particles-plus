@@ -174,6 +174,28 @@ Otherwise follow the branch → PR → maintainer-merges workflow in DEVELOPMENT
   during `KashiParticle.extractQuad`, itself part of the "extract" phase that happens before any
   render pass opens for the frame, not during `render()`/`buildLayer()` itself. `of()` is already
   cached per texture, so this costs nothing beyond the first particle of each effect.
+- **26.2 flipped its default depth-buffer convention to reversed-Z; 26.1.2 did not.** Confirmed
+  against the real source of both: `DepthStencilState.DEFAULT` is `(CompareOp.LESS_THAN_OR_EQUAL,
+  true)` on 26.1.2 but `(CompareOp.GREATER_THAN_OR_EQUAL, true)` on 26.2 - closer geometry now
+  writes a *larger* depth value, not smaller. `OPAQUE_PARTICLE`/`TRANSLUCENT_PARTICLE` never
+  noticed, because neither overrides the compare op - they just inherit whichever `DEFAULT` is
+  right for the generator they're compiled against. `KashiRenderType.ADDITIVE_PIPELINE` does
+  override it (to turn off `writeDepth` without disturbing the test), and it was copied verbatim
+  from the 26.1.2 file with the old `LESS_THAN_OR_EQUAL` - the one compare op that's actually
+  *wrong* for 26.2's convention. Real, confirmed symptom: every KASHI effect using `ADD` blend
+  rendered as an oversaturated blob on `neoforge-26.2` only (26.1.2, 1.21.1, 1.21.8 all rendered
+  correctly) - not from wrong geometry (checked with real per-particle position/size/rotation
+  logging from a live game session - correct) and not a storage leak (checked too - `clear()` runs
+  every frame, `storage.count` stays bounded and tracks the spawn/death curve exactly), but from
+  the inverted compare op never actually letting nearby terrain occlude overlapping additive
+  quads, so every one kept compositing on top of every other with no depth-based limit at all.
+  Confirmed by swapping the pipeline for `RenderPipelines.TRANSLUCENT_PARTICLE` (which inherits the
+  correct default) as an isolation step before finding the real cause - the shape rendered
+  correctly at once (wrong color, since that pipeline isn't additive, but correct shape) proving
+  the bug was in the pipeline, not the render state. **Lesson: a value copied from one overlay to
+  the sibling overlay for "the same API" is not safe to assume identical without checking the
+  actual default it's overriding - two generators sharing an otherwise near-identical pipeline
+  API can still disagree on what "default" means underneath it.**
 - **Editing an overlay's `.java` source is not enough - `make-runtime-templates.ps1` has to run
   again before `build-plugin.ps1`, every time, no exceptions.** Re-learned the hard way *again*
   this session (see the `WeightedOption` incident earlier in this file): fixed the texture-preload

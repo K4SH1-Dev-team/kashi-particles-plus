@@ -162,8 +162,40 @@ o salto do 1.21.8 — quase todo `runtime/` precisou de overlay, não só 2-3 ar
 
 Resultado: as cinco workspaces (`kashi_particle_test`, `teste_vinte_oito`, `true_particle_test`,
 `seis_um`, `seis_dois`) compilam limpo via `check-mod-compile.ps1`, e `run-core-tests.ps1` passa
-sob os dois JDKs. Falta o teste real do usuário (build Gradle de verdade nas 5 workspaces + os 4
-modos de blend visualmente, nas 4 que renderizam) antes da release.
+sob os dois JDKs.
+
+#### Quatro bugs reais pegos só em teste real (build Gradle + jogo, não `check-mod-compile.ps1`)
+
+Mesmo padrão da v2.5.1 acima — `check-mod-compile.ps1` não pegou nenhum dos quatro:
+
+- **`ResourceLocation` nos procedures de `26.1.2`/`26.2`**: os 3 templates de procedure desses dois
+  geradores foram copiados byte-a-byte do `1.21.1` na suposição de que "procedure nunca toca API
+  divergente" — falsa aqui, já que fully-qualificam `ResourceLocation.fromNamespaceAndPath(...)`, e
+  `check-mod-compile.ps1` nunca vê `src/<generator>/procedures/*.java.ftl`. Só um build Gradle real
+  revelou. Corrigido trocando pra `Identifier` nos 6 arquivos.
+- **`KashiParticleEffects.java.ftl` faltando em `26.1.2`/`26.2`**: o registro global de efeitos nunca
+  foi copiado pra esses dois geradores quando foram criados. MCreator não falha o build quando um
+  `global_templates` referencia um `.ftl` inexistente — só ignora silenciosamente. Nenhum efeito
+  disparava, sem erro nenhum; só um teste em jogo (`/kashiparticle_<mod> report`) revelou. Ver
+  [CLAUDE.md](CLAUDE.md).
+- **Crash de textura durante o render pass** (`IllegalStateException: Close the existing render
+  pass...`): o novo modelo de comando da GPU em 26.1.2/26.2 não permite carregar uma textura
+  enquanto um render pass está aberto — e a primeira textura de um efeito KASHI só era carregada
+  dentro do `render()`/`buildLayer()`, já dentro do pass. Corrigido pré-carregando a textura em
+  `KashiRenderType.of()`, que roda na fase de "extract" (antes de qualquer pass abrir).
+- **Blend `ADD` renderizando como um blob sem forma, só em `26.2`**: `Parry`, `Parry2`,
+  `InsectZigzagParry` e `InsectZigzagParry2` (todos `material: particles_add`) ficavam um blob
+  saturado sem forma reconhecível no `26.2`; `Stun`/`Nichirin` (blend alpha/cutout) sempre
+  renderizaram certo. Geometria e ciclo de vida do `Storage` confirmados corretos via log real de
+  jogo antes de achar a causa: `DepthStencilState.DEFAULT` mudou de `(LESS_THAN_OR_EQUAL, true)` no
+  `26.1.2` pra `(GREATER_THAN_OR_EQUAL, true)` no `26.2` (depth invertido/reversed-Z) —
+  `ADDITIVE_PIPELINE` sobrescreve esse compare op na mão (pra desligar `writeDepth`) e foi copiado
+  do `26.1.2` com o operador antigo, o único errado pra convenção do `26.2`. Sem oclusão de
+  profundidade correta, cada quad aditivo ficava se somando por cima do outro sem limite. Corrigido
+  trocando pra `GREATER_THAN_OR_EQUAL` só no arquivo do `26.2`. Ver [CLAUDE.md](CLAUDE.md).
+
+Falta o teste real do usuário (build Gradle de verdade nas 5 workspaces + os 4 modos de blend
+visualmente, nas 4 que renderizam) antes da release.
 
 ---
 
