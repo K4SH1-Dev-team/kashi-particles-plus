@@ -64,12 +64,29 @@ public final class KashiRenderType {
 	 * the ones behind it and the glow would stop accumulating.
 	 *
 	 * <p>Package-private, not private: {@link KashiParticleClient#onRegisterPipelines} needs to hand
-	 * this to {@code RegisterRenderPipelinesEvent} - see that method for why. */
+	 * this to {@code RegisterRenderPipelinesEvent} - see that method for why.
+	 *
+	 * <p>{@code GREATER_THAN_OR_EQUAL}, not {@code LESS_THAN_OR_EQUAL} like the 26.1.2 file - real,
+	 * confirmed divergence between the two: {@code DepthStencilState.DEFAULT} is {@code
+	 * (LESS_THAN_OR_EQUAL, true)} on 26.1.2 but {@code (GREATER_THAN_OR_EQUAL, true)} on 26.2 (26.2
+	 * switched to a reversed-Z depth buffer - closer geometry now writes a LARGER depth value, not a
+	 * smaller one). {@code OPAQUE_PARTICLE}/{@code TRANSLUCENT_PARTICLE} never noticed because
+	 * neither overrides the depth compare op - they just inherit whichever {@code DEFAULT} is
+	 * correct for the generator they're compiled against. This pipeline hardcodes its own compare
+	 * op instead (to keep {@code writeDepth} off without disturbing the test), so it has to track
+	 * the flip by hand. Confirmed to be the actual bug: every KASHI effect using {@code ADD} rendered
+	 * as an oversaturated blob on 26.2 - not from wrong geometry (checked with real per-particle
+	 * position/size/rotation logging - correct) or a storage leak (checked too - clears every frame,
+	 * bounded correctly) - but from the inverted compare op never actually occluding overlapping
+	 * particles against nearby terrain, so every additive quad kept compositing on top of every
+	 * other with no depth-based limit. Swapping this pipeline for {@code TRANSLUCENT_PARTICLE} (which
+	 * uses the correct inherited default) made the shape render correctly at once, isolating the bug
+	 * to this compare op before the fix below was made. */
 	static final RenderPipeline ADDITIVE_PIPELINE =
 			RenderPipeline.builder(RenderPipelines.PARTICLE_SNIPPET)
 					.withLocation("kashi/pipeline/additive_particle")
 					.withColorTargetState(new ColorTargetState(new BlendFunction(BlendFactor.SRC_ALPHA, BlendFactor.ONE)))
-					.withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false))
+					.withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false))
 					.build();
 
 	private static final Map<String, SingleQuadParticle.Layer> CACHE = new ConcurrentHashMap<>();

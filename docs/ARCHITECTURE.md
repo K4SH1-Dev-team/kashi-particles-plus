@@ -175,6 +175,14 @@ real `minecraft-patched-*.jar`/`-sources.jar` (never assumed from the other):
     still computes the same way, instead of the plain point test vanilla uses.
   - `ParticleProvider.createParticle` gained a trailing `RandomSource` parameter
     (`KashiParticleClient.java` - accepted, not currently used).
+  - **26.2 flipped the default depth-buffer convention to reversed-Z; 26.1.2 did not** - confirmed
+    against both real sources: `DepthStencilState.DEFAULT` is `(LESS_THAN_OR_EQUAL, true)` on
+    26.1.2, `(GREATER_THAN_OR_EQUAL, true)` on 26.2. `ADDITIVE_PIPELINE` explicitly sets its own
+    compare op (to disable `writeDepth` without disturbing the test), so it has to track this by
+    hand rather than inheriting the right default the way `OPAQUE_PARTICLE`/`TRANSLUCENT_PARTICLE`
+    do - a real bug where the 26.2 file was copied from 26.1.2 with the wrong (old) compare op,
+    causing every `ADD`-blend effect to render as an unoccluded, oversaturated blob on 26.2 only.
+    See CLAUDE.md for the full diagnosis.
 
 Every generator's procedure templates (`src/<generator>/procedures/*.java.ftl`) and the two
 non-runtime templates (`particle.json.ftl`, `KashiParticleEffects.java.ftl`) are plain copies, not
