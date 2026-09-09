@@ -76,9 +76,26 @@ public final class KashiParticleAPI {
 	public static void spawnKashiParticle(Level level, Identifier effectId,
 			double x, double y, double z, double dirX, double dirY, double dirZ, int entityId,
 			float scaleOffset, float durationOffset) {
+		spawnKashiParticle(level, effectId, x, y, z, dirX, dirY, dirZ, entityId,
+				scaleOffset, durationOffset, "");
+	}
+
+	/**
+	 * The real implementation, with an attach point on top of everything the other overload
+	 * takes. Every other overload delegates here (through the one above).
+	 *
+	 * @param attachPoint which point on {@code entityId} the spawn should keep tracking every
+	 *                     tick - empty for a one-shot spawn, non-empty only from "Attach K4SH1
+	 *                     Particle to Entity" (see {@code KashiParticleAPI#attachToEntity}); see
+	 *                     {@code KashiEmitterParticle#resolveAnchorPosition()} for the values it
+	 *                     understands
+	 */
+	public static void spawnKashiParticle(Level level, Identifier effectId,
+			double x, double y, double z, double dirX, double dirY, double dirZ, int entityId,
+			float scaleOffset, float durationOffset, String attachPoint) {
 		ParticleOptions options = new KashiParticleOptions(effectId,
 				(float) dirX, (float) dirY, (float) dirZ, entityId,
-				new KashiParticleOptions.Extras(scaleOffset, durationOffset));
+				new KashiParticleOptions.Extras(scaleOffset, durationOffset, attachPoint));
 
 		if (level instanceof ServerLevel serverLevel) {
 			for (ServerPlayer player : serverLevel.players())
@@ -126,23 +143,105 @@ public final class KashiParticleAPI {
 		if (entity == null)
 			return;
 
+		Vec3 origin = entityFrameOffset(entity, entity.position(), right, up, forward);
+		Vec3 aim = aimVector(entity, aimMode);
+
+		spawnKashiParticle(level, effectId, origin.x, origin.y, origin.z, aim.x, aim.y, aim.z,
+				entity.getId(), scaleOffset, durationOffset);
+	}
+
+	/**
+	 * Fires an effect that keeps following an entity every tick, anchored at a point on it, instead
+	 * of spawning once at a fixed position - an aura, fire on the feet, energy in a hand.
+	 *
+	 * <p>The offset and aim work like {@link #spawnFromEntity}, except {@code right}/{@code up}/
+	 * {@code forward} are measured from {@code attachPoint} itself (see {@link #resolveAttachPoint})
+	 * rather than always the entity's feet - {@code up: 0} lands the effect exactly on the chosen
+	 * point, matching what {@code KashiEmitterParticle} then keeps tracking every tick from there
+	 * on, rather than only reading the entity's position once at fire time - see
+	 * {@code KashiEmitterParticle#resolveAnchorPosition()} for the tracking mechanism itself, which
+	 * calls this same {@link #resolveAttachPoint} so the two never disagree about where a point is.
+	 *
+	 * <p>Only position is forced to follow. An offset does not swing around as the entity turns
+	 * unless the effect being fired separately authors {@code minecraft:emitter_local_space}'s
+	 * {@code rotation} switch itself - deliberate, not an oversight: most of what this is for (an
+	 * aura or fire at zero offset, energy roughly centred on a hand) does not need it.
+	 *
+	 * <p>Like every KASHI spawn, this is still bounded by the emitter's own fire-and-forget lifetime
+	 * cap - an attached looping effect still ends on its own after at most 30 seconds, even though
+	 * it kept following the entity right up until then. There is no way to attach one that runs
+	 * until the entity itself does something to end it; that needs a way to name and later stop a
+	 * running instance, which this does not provide.
+	 *
+	 * @param attachPoint {@code "ROOT"} (root/body), {@code "HEAD"} or {@code "EYE"} for the
+	 *                    low-effort anchors this overload is for today - see
+	 *                    {@code KashiEmitterParticle#resolveAnchorPosition()} for the full list as
+	 *                    it grows
+	 */
+	public static void attachToEntity(Level level, Identifier effectId, Entity entity,
+			double right, double up, double forward, String aimMode, String attachPoint,
+			float scaleOffset, float durationOffset) {
+		if (entity == null || attachPoint == null || attachPoint.isEmpty())
+			return;
+
+		Vec3 base = resolveAttachPoint(entity, attachPoint);
+		Vec3 origin = entityFrameOffset(entity, base, right, up, forward);
+		Vec3 aim = aimVector(entity, aimMode);
+
+		spawnKashiParticle(level, effectId, origin.x, origin.y, origin.z, aim.x, aim.y, aim.z,
+				entity.getId(), scaleOffset, durationOffset, attachPoint);
+	}
+
+	/**
+	 * The world position on {@code entity} that an attach point names - the single source of truth
+	 * both {@link #attachToEntity} (the initial spawn origin, which may run server-side) and {@code
+	 * KashiEmitterParticle} (the per-tick follow, client-only) call, so the two never disagree about
+	 * where "ROOT"/"HEAD"/"EYE" actually is - a mismatch there would make the effect's fine offset,
+	 * captured once at spawn as the gap to the anchor, cancel the chosen point out on the very next
+	 * tick instead of tracking it.
+	 *
+	 * <p>{@code ""} (every spawn except Attach) and {@code "EYE"} both resolve to {@link
+	 * Entity#getEyePosition()} - the same point {@code emitter_local_space} alone always tracked
+	 * before this method existed, so an effect using it on its own is unaffected. {@code "ROOT"}
+	 * covers both "root" and "body" from the Attach dropdown - no meaningful difference for a
+	 * generic {@link Entity}. {@code "HEAD"} is a plain fraction of the entity's own bounding-box
+	 * height, not a real head-bone lookup - a documented approximation, tuned against what actually
+	 * looks right in-game rather than derived.
+	 */
+	public static Vec3 resolveAttachPoint(Entity entity, String attachPoint) {
+		return switch (attachPoint) {
+			case "ROOT" -> entity.position();
+			case "HEAD" -> entity.position().add(0, entity.getBbHeight() * 0.9, 0);
+			default -> entity.getEyePosition(); // "" (legacy) and "EYE" both land here
+		};
+	}
+
+	/**
+	 * A world point offset from {@code base} in the entity's own frame - {@code forward} is where
+	 * it is facing horizontally, {@code right} across that, {@code up} straight from {@code base}.
+	 * Shared by {@link #spawnFromEntity} (which always passes {@code entity.position()}, its feet)
+	 * and {@link #attachToEntity} (which passes {@link #resolveAttachPoint}'s result instead), so
+	 * the two agree on what an offset means once the base point itself is settled.
+	 */
+	private static Vec3 entityFrameOffset(Entity entity, Vec3 base, double right, double up, double forward) {
 		Vec3 look = entity.getLookAngle();
 		Vec3 flat = new Vec3(look.x, 0, look.z);
 		Vec3 facing = flat.lengthSqr() < 1.0e-6 ? new Vec3(0, 0, -1) : flat.normalize();
 		Vec3 side = new Vec3(-facing.z, 0, facing.x);
 
-		Vec3 origin = entity.position()
-				.add(side.scale(right))
-				.add(0, up, 0)
-				.add(facing.scale(forward));
+		return base.add(side.scale(right)).add(0, up, 0).add(facing.scale(forward));
+	}
 
-		Vec3 aim = switch (aimMode == null ? AIM_FULL : aimMode) {
+	/** The direction an effect as a whole is aimed, per {@link #AIM_NONE}/{@link #AIM_HORIZONTAL}/{@link #AIM_FULL}. */
+	private static Vec3 aimVector(Entity entity, String aimMode) {
+		Vec3 look = entity.getLookAngle();
+		Vec3 flat = new Vec3(look.x, 0, look.z);
+		Vec3 facing = flat.lengthSqr() < 1.0e-6 ? new Vec3(0, 0, -1) : flat.normalize();
+
+		return switch (aimMode == null ? AIM_FULL : aimMode) {
 			case AIM_NONE -> Vec3.ZERO;
 			case AIM_HORIZONTAL -> facing;
 			default -> look;
 		};
-
-		spawnKashiParticle(level, effectId, origin.x, origin.y, origin.z, aim.x, aim.y, aim.z,
-				entity.getId(), scaleOffset, durationOffset);
 	}
 }
