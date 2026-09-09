@@ -172,10 +172,12 @@ public final class KashiParticleAPI {
 	 * {@code KashiEmitterParticle#resolveAnchorPosition()} for the tracking mechanism itself, which
 	 * calls this same {@link #resolveAttachPoint} so the two never disagree about where a point is.
 	 *
-	 * <p>Only position is forced to follow. An offset does not swing around as the entity turns
-	 * unless the effect being fired separately authors {@code minecraft:emitter_local_space}'s
-	 * {@code rotation} switch itself - deliberate, not an oversight: most of what this is for (an
-	 * aura or fire at zero offset, energy roughly centred on a hand) does not need it.
+	 * <p>Position AND rotation both follow - unlike a plain {@code minecraft:emitter_local_space}
+	 * effect (which only turns with yaw, deliberately never pitch - see {@code
+	 * KashiEmitterParticle#yawFrame}), an attached effect follows the FULL look direction, pitch
+	 * included: turning to look up or down turns the effect (and any offset it has) the same way,
+	 * which is what makes a HEAD/EYE anchor with a forward offset feel attached rather than merely
+	 * nearby. See {@code KashiEmitterParticle#fullLookFrame}.
 	 *
 	 * <p>Like every KASHI spawn, this is still bounded by the emitter's own fire-and-forget lifetime
 	 * cap - an attached looping effect still ends on its own after at most 30 seconds, even though

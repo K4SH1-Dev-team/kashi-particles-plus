@@ -44,10 +44,11 @@ public class KashiEmitterParticle extends Particle {
 
 	/**
 	 * Non-empty only for a spawn from the "Attach K4SH1 Particle to Entity" procedure - forces
-	 * position tracking regardless of what the source {@code .particle.json} authored in {@link
-	 * #localSpace}, and picks which point on the entity {@link #resolveAnchorPosition()} tracks.
-	 * Empty for every other spawn path, which is what keeps this feature additive: nothing here
-	 * changes for an effect that never opted into being attached.
+	 * position AND rotation tracking (yaw and pitch both - see {@link #fullLookFrame}) regardless
+	 * of what the source {@code .particle.json} authored in {@link #localSpace}, and picks which
+	 * point on the entity {@link #resolveAnchorPosition()} tracks. Empty for every other spawn
+	 * path, which is what keeps this feature additive: nothing here changes for an effect that
+	 * never opted into being attached.
 	 */
 	private final String attachPoint;
 
@@ -251,7 +252,7 @@ public class KashiEmitterParticle extends Particle {
 		net.minecraft.world.phys.Vec3 point = resolveAnchorPosition();
 
 		this.worldOffset.set((float) (x - point.x), (float) (y - point.y), (float) (z - point.z));
-		this.previousFrame = yawFrame(this.anchor);
+		this.previousFrame = followFrame(this.anchor);
 
 		Quaternionf inverse = new Quaternionf(this.previousFrame).conjugate();
 
@@ -278,7 +279,9 @@ public class KashiEmitterParticle extends Particle {
 	 *
 	 * <p>Deliberately not the full look direction: binding to pitch as well would make a effect
 	 * fired while looking level tip over the moment the player glanced up, which is not what
-	 * "follows the entity" means to anyone authoring one.
+	 * "follows the entity" means to anyone authoring one. This is what {@code
+	 * minecraft:emitter_local_space}'s own {@code rotation} switch has always used, and still does
+	 * - {@link #followFrame} is what changed, not this method.
 	 */
 	private static Quaternionf yawFrame(net.minecraft.world.entity.Entity entity) {
 		net.minecraft.world.phys.Vec3 look = entity.getLookAngle();
@@ -287,6 +290,25 @@ public class KashiEmitterParticle extends Particle {
 			return new Quaternionf();
 
 		return new Quaternionf().rotateY((float) Math.atan2(-look.x, -look.z));
+	}
+
+	/**
+	 * The anchor's heading as a rotation, yaw AND pitch - reuses {@link #aimQuaternion} against the
+	 * anchor's own look direction rather than re-deriving the same yaw/pitch decomposition. Used
+	 * only for Attach ({@link #hasAttachPoint()}): a HEAD or EYE point turning to look up or down is
+	 * exactly what an attached effect should follow, unlike a plain {@code emitter_local_space}
+	 * effect, which keeps the yaw-only behaviour {@link #yawFrame} always had (see its own doc
+	 * comment for why pitch is deliberately excluded there).
+	 */
+	private static Quaternionf fullLookFrame(net.minecraft.world.entity.Entity entity) {
+		net.minecraft.world.phys.Vec3 look = entity.getLookAngle();
+
+		return aimQuaternion(look.x, look.y, look.z);
+	}
+
+	/** Which heading {@link #bindToAnchor}/{@link #followAnchor} track - see {@link #fullLookFrame}. */
+	private Quaternionf followFrame(net.minecraft.world.entity.Entity entity) {
+		return hasAttachPoint() ? fullLookFrame(entity) : yawFrame(entity);
 	}
 
 	/**
@@ -302,9 +324,12 @@ public class KashiEmitterParticle extends Particle {
 		if (this.anchor == null || !this.anchor.isAlive())
 			return;
 
-		Quaternionf frame = yawFrame(this.anchor);
+		Quaternionf frame = followFrame(this.anchor);
 
-		if (this.localSpace.rotation()) {
+		// Attach forces rotation tracking too, on top of position - see followFrame()/
+		// resolveAnchorPosition()'s doc comments. Velocity inheritance stays driven by localSpace
+		// alone, untouched by attachPoint, on purpose.
+		if (this.localSpace.rotation() || hasAttachPoint()) {
 			// The turn since last tick, in world axes: what every particle has to be swung by.
 			new Quaternionf(this.previousFrame).conjugate().premul(frame, this.carryRotation);
 
@@ -314,9 +339,9 @@ public class KashiEmitterParticle extends Particle {
 
 		this.previousFrame = frame;
 
-		// Attach forces position tracking regardless of what the source effect authored - see
-		// resolveAnchorPosition()'s doc comment. Rotation/velocity inheritance stay driven by
-		// localSpace alone, untouched by attachPoint, on purpose.
+		// Attach forces position tracking too, regardless of what the source effect authored - see
+		// resolveAnchorPosition()'s doc comment. Velocity inheritance is the one thing that stays
+		// driven by localSpace alone, untouched by attachPoint, on purpose.
 		if (!this.localSpace.position() && !hasAttachPoint())
 			return;
 
@@ -377,7 +402,7 @@ public class KashiEmitterParticle extends Particle {
 	}
 
 	boolean turnsParticles() {
-		return this.anchor != null && this.localSpace.rotation();
+		return this.anchor != null && (this.localSpace.rotation() || hasAttachPoint());
 	}
 
 	/**
