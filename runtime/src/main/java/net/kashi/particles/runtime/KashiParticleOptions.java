@@ -25,10 +25,11 @@ import net.minecraft.resources.ResourceLocation;
  * firing side is not the one the client renders — the client resolves the id against its own level.
  * It is only consulted by effects that declare {@code minecraft:emitter_local_space}.
  *
- * <p>{@link #extras} carries the additive scale/duration offsets (see {@link Extras}). They are
- * grouped into their own record rather than sitting alongside the other fields because
- * {@link StreamCodec#composite} tops out at six type parameters and this record was already at
- * five - nesting keeps both codecs under that limit instead of requiring a hand-written one.
+ * <p>{@link #extras} carries the additive scale/duration offsets and the attach point (see
+ * {@link Extras}). They are grouped into their own record rather than sitting alongside the other
+ * fields because {@link StreamCodec#composite} tops out at six type parameters and this record
+ * was already at five - nesting keeps both codecs under that limit instead of requiring a
+ * hand-written one.
  */
 public record KashiParticleOptions(ResourceLocation effectId, float dirX, float dirY, float dirZ,
 		int entityId, Extras extras) implements ParticleOptions {
@@ -45,7 +46,7 @@ public record KashiParticleOptions(ResourceLocation effectId, float dirX, float 
 		this(effectId, dirX, dirY, dirZ, entityId, Extras.NONE);
 	}
 
-	/** {@link #extras}'s accessor is the record's own; these read straight through it. */
+	/** {@link #extras}'s accessors are the record's own; these read straight through it. */
 	public float scaleOffset() {
 		return this.extras.scaleOffset();
 	}
@@ -54,23 +55,34 @@ public record KashiParticleOptions(ResourceLocation effectId, float dirX, float 
 		return this.extras.durationOffset();
 	}
 
+	/** Which point on {@link #entityId} to track; empty for every spawn except an Attach one. */
+	public String attachPoint() {
+		return this.extras.attachPoint();
+	}
+
 	/**
 	 * Additive scale/duration offsets a spawn can apply on top of what the effect authored in
-	 * Snowstorm. Both default to {@code 0}, which is a no-op — per the plugin's governing rule,
-	 * an unfilled offset always leaves Snowstorm as the source of truth.
+	 * Snowstorm, plus the attach point for "Attach K4SH1 Particle to Entity". The offsets default
+	 * to {@code 0}, which is a no-op — per the plugin's governing rule, an unfilled offset always
+	 * leaves Snowstorm as the source of truth; {@code attachPoint} defaults to {@code ""}, which
+	 * leaves {@link #entityId} consulted only by an effect that authors
+	 * {@code minecraft:emitter_local_space} itself, exactly as before this field existed.
 	 *
 	 * @param scaleOffset    added to the authored half-width/half-height every frame, floored at 0
 	 * @param durationOffset added to the emitter's {@code active_time} (how long it keeps spawning
 	 *                       new particles) - not to any individual particle's {@code max_lifetime}
+	 * @param attachPoint    {@code "ROOT"}, {@code "HEAD"} or {@code "EYE"} - see
+	 *                       {@code KashiEmitterParticle#resolveAnchorPosition()}
 	 */
-	public record Extras(float scaleOffset, float durationOffset) {
+	public record Extras(float scaleOffset, float durationOffset, String attachPoint) {
 
-		public static final Extras NONE = new Extras(0, 0);
+		public static final Extras NONE = new Extras(0, 0, "");
 
 		static final StreamCodec<net.minecraft.network.FriendlyByteBuf, Extras> STREAM_CODEC =
 				StreamCodec.composite(
 						ByteBufCodecs.FLOAT, Extras::scaleOffset,
 						ByteBufCodecs.FLOAT, Extras::durationOffset,
+						ByteBufCodecs.stringUtf8(32), Extras::attachPoint,
 						Extras::new);
 	}
 
@@ -85,9 +97,11 @@ public record KashiParticleOptions(ResourceLocation effectId, float dirX, float 
 					com.mojang.serialization.Codec.FLOAT.optionalFieldOf("scale", 0f)
 							.forGetter(KashiParticleOptions::scaleOffset),
 					com.mojang.serialization.Codec.FLOAT.optionalFieldOf("duration", 0f)
-							.forGetter(KashiParticleOptions::durationOffset))
-			.apply(instance, (effectId, dx, dy, dz, entity, scale, duration) ->
-					new KashiParticleOptions(effectId, dx, dy, dz, entity, new Extras(scale, duration))));
+							.forGetter(KashiParticleOptions::durationOffset),
+					com.mojang.serialization.Codec.STRING.optionalFieldOf("attach", "")
+							.forGetter(KashiParticleOptions::attachPoint))
+			.apply(instance, (effectId, dx, dy, dz, entity, scale, duration, attach) ->
+					new KashiParticleOptions(effectId, dx, dy, dz, entity, new Extras(scale, duration, attach))));
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, KashiParticleOptions> STREAM_CODEC =
 			StreamCodec.composite(

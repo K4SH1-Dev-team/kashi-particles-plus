@@ -42,6 +42,16 @@ public class KashiEmitterParticle extends Particle {
 
 	private final KashiParticleDefinition.LocalSpace localSpace;
 
+	/**
+	 * Non-empty only for a spawn from the "Attach K4SH1 Particle to Entity" procedure - forces
+	 * position AND rotation tracking (yaw and pitch both - see {@link #fullLookFrame}) regardless
+	 * of what the source {@code .particle.json} authored in {@link #localSpace}, and picks which
+	 * point on the entity {@link #resolveAnchorPosition()} tracks. Empty for every other spawn
+	 * path, which is what keeps this feature additive: nothing here changes for an effect that
+	 * never opted into being attached.
+	 */
+	private final String attachPoint;
+
 	/** The entity this effect follows, or null when it is world-space or nothing was named. */
 	private final net.minecraft.world.entity.Entity anchor;
 
@@ -97,42 +107,46 @@ public class KashiEmitterParticle extends Particle {
 
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor) {
-		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, 0, 0);
+		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, 0, 0, "");
 	}
 
 	/** @param eventDepth how many chained events deep this emitter already is; 0 when fired directly */
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor,
 			int eventDepth) {
-		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, eventDepth, 0, 0);
+		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, eventDepth, 0, 0, "");
 	}
 
 	/**
 	 * As the no-offset constructor, with additive scale/duration offsets from the spawn that fired
 	 * this effect directly (an event-chained child always gets {@code 0, 0} — see the other
 	 * constructor - a hit-effect triggered by a parent effect is its own authored effect, not a
-	 * continuation of whatever offset the parent's spawn happened to carry).
+	 * continuation of whatever offset the parent's spawn happened to carry), and an optional
+	 * attach point (see {@link #attachPoint}, empty for every spawn except "Attach K4SH1 Particle
+	 * to Entity").
 	 */
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor,
-			float scaleOffset, float durationOffset) {
-		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, scaleOffset, durationOffset);
+			float scaleOffset, float durationOffset, String attachPoint) {
+		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, scaleOffset, durationOffset, attachPoint);
 	}
 
 	/** @param eventDepth how many chained events deep this emitter already is; 0 when fired directly */
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor,
-			int eventDepth, float scaleOffset, float durationOffset) {
+			int eventDepth, float scaleOffset, float durationOffset, String attachPoint) {
 		super(level, x, y, z);
 
 		this.scaleOffset = scaleOffset;
 
 		this.eventDepth = eventDepth;
 
+		this.attachPoint = attachPoint == null ? "" : attachPoint;
+
 		this.localSpace = effect.definition().localSpace();
-		// An effect that never asked to be local ignores the anchor entirely, so passing one can
-		// never change an effect that was already correct.
-		this.anchor = this.localSpace.any() ? anchor : null;
+		// An effect that never asked to be local, and was not fired through Attach either, ignores
+		// the anchor entirely, so passing one can never change an effect that was already correct.
+		this.anchor = (this.localSpace.any() || hasAttachPoint()) ? anchor : null;
 
 		this.effect = effect;
 		this.context = effect.newContext();
@@ -235,10 +249,10 @@ public class KashiEmitterParticle extends Particle {
 		if (this.anchor == null)
 			return;
 
-		net.minecraft.world.phys.Vec3 eye = this.anchor.getEyePosition();
+		net.minecraft.world.phys.Vec3 point = resolveAnchorPosition();
 
-		this.worldOffset.set((float) (x - eye.x), (float) (y - eye.y), (float) (z - eye.z));
-		this.previousFrame = yawFrame(this.anchor);
+		this.worldOffset.set((float) (x - point.x), (float) (y - point.y), (float) (z - point.z));
+		this.previousFrame = followFrame(this.anchor);
 
 		Quaternionf inverse = new Quaternionf(this.previousFrame).conjugate();
 
@@ -246,12 +260,28 @@ public class KashiEmitterParticle extends Particle {
 		inverse.mul(this.aim, this.localAim);
 	}
 
+	private boolean hasAttachPoint() {
+		return !this.attachPoint.isEmpty();
+	}
+
+	/**
+	 * The world position {@link #bindToAnchor}/{@link #followAnchor} track this tick - delegates to
+	 * {@link KashiParticleAPI#resolveAttachPoint} so this class and the initial spawn-origin
+	 * computation for "Attach K4SH1 Particle to Entity" (which can run server-side, so cannot call
+	 * back into this client-only class) never disagree about where a named point actually is.
+	 */
+	private net.minecraft.world.phys.Vec3 resolveAnchorPosition() {
+		return KashiParticleAPI.resolveAttachPoint(this.anchor, this.attachPoint);
+	}
+
 	/**
 	 * The anchor's heading as a rotation, yaw only.
 	 *
 	 * <p>Deliberately not the full look direction: binding to pitch as well would make a effect
 	 * fired while looking level tip over the moment the player glanced up, which is not what
-	 * "follows the entity" means to anyone authoring one.
+	 * "follows the entity" means to anyone authoring one. This is what {@code
+	 * minecraft:emitter_local_space}'s own {@code rotation} switch has always used, and still does
+	 * - {@link #followFrame} is what changed, not this method.
 	 */
 	private static Quaternionf yawFrame(net.minecraft.world.entity.Entity entity) {
 		net.minecraft.world.phys.Vec3 look = entity.getLookAngle();
@@ -260,6 +290,25 @@ public class KashiEmitterParticle extends Particle {
 			return new Quaternionf();
 
 		return new Quaternionf().rotateY((float) Math.atan2(-look.x, -look.z));
+	}
+
+	/**
+	 * The anchor's heading as a rotation, yaw AND pitch - reuses {@link #aimQuaternion} against the
+	 * anchor's own look direction rather than re-deriving the same yaw/pitch decomposition. Used
+	 * only for Attach ({@link #hasAttachPoint()}): a HEAD or EYE point turning to look up or down is
+	 * exactly what an attached effect should follow, unlike a plain {@code emitter_local_space}
+	 * effect, which keeps the yaw-only behaviour {@link #yawFrame} always had (see its own doc
+	 * comment for why pitch is deliberately excluded there).
+	 */
+	private static Quaternionf fullLookFrame(net.minecraft.world.entity.Entity entity) {
+		net.minecraft.world.phys.Vec3 look = entity.getLookAngle();
+
+		return aimQuaternion(look.x, look.y, look.z);
+	}
+
+	/** Which heading {@link #bindToAnchor}/{@link #followAnchor} track - see {@link #fullLookFrame}. */
+	private Quaternionf followFrame(net.minecraft.world.entity.Entity entity) {
+		return hasAttachPoint() ? fullLookFrame(entity) : yawFrame(entity);
 	}
 
 	/**
@@ -275,9 +324,12 @@ public class KashiEmitterParticle extends Particle {
 		if (this.anchor == null || !this.anchor.isAlive())
 			return;
 
-		Quaternionf frame = yawFrame(this.anchor);
+		Quaternionf frame = followFrame(this.anchor);
 
-		if (this.localSpace.rotation()) {
+		// Attach forces rotation tracking too, on top of position - see followFrame()/
+		// resolveAnchorPosition()'s doc comments. Velocity inheritance stays driven by localSpace
+		// alone, untouched by attachPoint, on purpose.
+		if (this.localSpace.rotation() || hasAttachPoint()) {
 			// The turn since last tick, in world axes: what every particle has to be swung by.
 			new Quaternionf(this.previousFrame).conjugate().premul(frame, this.carryRotation);
 
@@ -287,14 +339,17 @@ public class KashiEmitterParticle extends Particle {
 
 		this.previousFrame = frame;
 
-		if (!this.localSpace.position())
+		// Attach forces position tracking too, regardless of what the source effect authored - see
+		// resolveAnchorPosition()'s doc comment. Velocity inheritance is the one thing that stays
+		// driven by localSpace alone, untouched by attachPoint, on purpose.
+		if (!this.localSpace.position() && !hasAttachPoint())
 			return;
 
-		net.minecraft.world.phys.Vec3 eye = this.anchor.getEyePosition();
+		net.minecraft.world.phys.Vec3 point = resolveAnchorPosition();
 
-		double targetX = eye.x + this.worldOffset.x();
-		double targetY = eye.y + this.worldOffset.y();
-		double targetZ = eye.z + this.worldOffset.z();
+		double targetX = point.x + this.worldOffset.x();
+		double targetY = point.y + this.worldOffset.y();
+		double targetZ = point.z + this.worldOffset.z();
 
 		this.carryX = targetX - this.x;
 		this.carryY = targetY - this.y;
@@ -343,11 +398,11 @@ public class KashiEmitterParticle extends Particle {
 	}
 
 	boolean carriesParticles() {
-		return this.anchor != null && this.localSpace.position();
+		return this.anchor != null && (this.localSpace.position() || hasAttachPoint());
 	}
 
 	boolean turnsParticles() {
-		return this.anchor != null && this.localSpace.rotation();
+		return this.anchor != null && (this.localSpace.rotation() || hasAttachPoint());
 	}
 
 	/**

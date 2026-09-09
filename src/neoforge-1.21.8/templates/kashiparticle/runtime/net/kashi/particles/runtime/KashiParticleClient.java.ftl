@@ -54,7 +54,7 @@ public final class KashiParticleClient {
 					options.dirX(), options.dirY(), options.dirZ(),
 					options.entityId() == KashiParticleOptions.NO_ENTITY
 							? null : level.getEntity(options.entityId()),
-					options.scaleOffset(), options.durationOffset());
+					options.scaleOffset(), options.durationOffset(), options.attachPoint());
 		}
 	}
 }
