@@ -5,6 +5,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
@@ -173,10 +174,11 @@ public final class KashiParticleAPI {
 	 * until the entity itself does something to end it; that needs a way to name and later stop a
 	 * running instance, which this does not provide.
 	 *
-	 * @param attachPoint {@code "ROOT"} (root/body), {@code "HEAD"} or {@code "EYE"} for the
-	 *                    low-effort anchors this overload is for today - see
-	 *                    {@code KashiEmitterParticle#resolveAnchorPosition()} for the full list as
-	 *                    it grows
+	 * @param attachPoint {@code "ROOT"} (root/body), {@code "HEAD"}, {@code "EYE"}, or one of
+	 *                    {@code "HAND_RIGHT"}/{@code "HAND_LEFT"}/{@code "FOOT_RIGHT"}/
+	 *                    {@code "FOOT_LEFT"} - see {@link #resolveAttachPoint} for what each names
+	 *                    and {@link #resolveLimbSwingRadians} for how the limb ones also turn the
+	 *                    effect as the limb swings
 	 */
 	public static void attachToEntity(Level level, ResourceLocation effectId, Entity entity,
 			double right, double up, double forward, String aimMode, String attachPoint,
@@ -207,13 +209,104 @@ public final class KashiParticleAPI {
 	 * generic {@link Entity}. {@code "HEAD"} is a plain fraction of the entity's own bounding-box
 	 * height, not a real head-bone lookup - a documented approximation, tuned against what actually
 	 * looks right in-game rather than derived.
+	 *
+	 * <p>{@code "HAND_RIGHT"}/{@code "HAND_LEFT"}/{@code "FOOT_RIGHT"}/{@code "FOOT_LEFT"} are the
+	 * same kind of visually-tuned approximation, driven by {@link LivingEntity#getAttackAnim} and
+	 * {@link LivingEntity#walkAnimation} rather than a real arm/leg bone - see {@link #resolveHand}/
+	 * {@link #resolveFoot}. An {@link Entity} that is not a {@link LivingEntity} (a dropped item,
+	 * say) falls back to the same point as {@code "ROOT"} for these four - no crash, just a less
+	 * interesting result for something with no limbs to swing.
 	 */
 	public static Vec3 resolveAttachPoint(Entity entity, String attachPoint) {
 		return switch (attachPoint) {
 			case "ROOT" -> entity.position();
 			case "HEAD" -> entity.position().add(0, entity.getBbHeight() * 0.9, 0);
+			case "HAND_RIGHT" -> resolveHand(entity, true);
+			case "HAND_LEFT" -> resolveHand(entity, false);
+			case "FOOT_RIGHT" -> resolveFoot(entity, true);
+			case "FOOT_LEFT" -> resolveFoot(entity, false);
 			default -> entity.getEyePosition(); // "" (legacy) and "EYE" both land here
 		};
+	}
+
+	/**
+	 * How far {@code KashiEmitterParticle#followFrame} should tilt the rotation frame beyond the
+	 * entity's own look direction, so an effect attached to a hand/foot turns as the limb swings -
+	 * {@code 0} (no extra tilt) for every other attach point, or when {@code entity} is not a
+	 * {@link LivingEntity}. Lives here rather than in {@code KashiEmitterParticle} (which is the
+	 * only caller - this is a client-only concern, the server never needs to know which way an
+	 * effect is turned) so it can share {@link LimbAnimState} with {@link #resolveHand}/
+	 * {@link #resolveFoot} instead of reading {@code walkAnimation}/{@code getAttackAnim} twice.
+	 */
+	public static float resolveLimbSwingRadians(Entity entity, String attachPoint) {
+		if (!(entity instanceof LivingEntity living))
+			return 0f;
+		return switch (attachPoint) {
+			case "HAND_RIGHT", "HAND_LEFT" -> handSwingRadians(LimbAnimState.of(living));
+			case "FOOT_RIGHT", "FOOT_LEFT" ->
+					footSwingRadians(LimbAnimState.of(living), attachPoint.equals("FOOT_RIGHT"));
+			default -> 0f;
+		};
+	}
+
+	// Calibration constants for the hand/foot approximation - initial guesses, tuned against how
+	// they actually look in-game (Player and a vanilla biped) rather than treated as exact.
+	private static final double SHOULDER_HEIGHT = 1.3;
+	private static final double ARM_WIDTH = 0.3;
+	private static final double ARM_LENGTH = 0.6;
+	private static final double LEG_WIDTH = 0.15;
+	private static final double STRIDE_LENGTH = 0.3;
+	private static final float MAX_HAND_SWING = (float) Math.toRadians(60);
+	private static final float MAX_FOOT_SWING = (float) Math.toRadians(35);
+
+	/**
+	 * The three animation readings {@link #resolveHand}/{@link #resolveFoot}/
+	 * {@link #resolveLimbSwingRadians} all need, read once per call instead of each reaching into
+	 * {@code walkAnimation}/{@code getAttackAnim} separately.
+	 */
+	private record LimbAnimState(float attack, float swingAmount, float swingPhase) {
+		static LimbAnimState of(LivingEntity living) {
+			return new LimbAnimState(living.getAttackAnim(1.0f), living.walkAnimation.speed(1.0f),
+					living.walkAnimation.position(1.0f));
+		}
+	}
+
+	/**
+	 * Approximated from swing/attack animation state, calibrated visually - not a literal read of
+	 * the entity's actual arm pose. Falls back to {@code "ROOT"}'s point when {@code entity} is not
+	 * a {@link LivingEntity} (see {@link #resolveAttachPoint}).
+	 */
+	private static Vec3 resolveHand(Entity entity, boolean rightSide) {
+		if (!(entity instanceof LivingEntity living))
+			return entity.position();
+		LimbAnimState anim = LimbAnimState.of(living);
+		double side = (rightSide ? 1 : -1) * ARM_WIDTH; // right positive = the entity's actual right
+		double forward = anim.attack() * ARM_LENGTH
+				+ Math.sin(anim.swingPhase() * 0.6662) * anim.swingAmount() * 0.1; // walking sway
+		return entityFrameOffset(living, living.position(), side, SHOULDER_HEIGHT, forward);
+	}
+
+	/** Same approximation as {@link #resolveHand}, for a foot instead - see its doc comment. */
+	private static Vec3 resolveFoot(Entity entity, boolean rightSide) {
+		if (!(entity instanceof LivingEntity living))
+			return entity.position();
+		LimbAnimState anim = LimbAnimState.of(living);
+		double phaseOffset = rightSide ? 0 : Math.PI; // legs alternate, same as vanilla walk animation
+		double side = (rightSide ? 1 : -1) * LEG_WIDTH;
+		double forward = Math.sin(anim.swingPhase() * 0.6662 + phaseOffset) * anim.swingAmount() * STRIDE_LENGTH;
+		return entityFrameOffset(living, living.position(), side, 0, forward); // up=0: foot on the ground
+	}
+
+	/** The extra rotation {@link #resolveLimbSwingRadians} applies for a hand - see its doc comment. */
+	private static float handSwingRadians(LimbAnimState anim) {
+		return anim.attack() * MAX_HAND_SWING
+				+ (float) Math.sin(anim.swingPhase() * 0.6662) * anim.swingAmount() * 0.2f;
+	}
+
+	/** The extra rotation {@link #resolveLimbSwingRadians} applies for a foot - see its doc comment. */
+	private static float footSwingRadians(LimbAnimState anim, boolean rightSide) {
+		double phaseOffset = rightSide ? 0 : Math.PI;
+		return (float) (Math.sin(anim.swingPhase() * 0.6662 + phaseOffset) * anim.swingAmount()) * MAX_FOOT_SWING;
 	}
 
 	/**
