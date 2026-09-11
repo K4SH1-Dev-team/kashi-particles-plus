@@ -17,7 +17,11 @@
       "options": [
         ["root/body", "ROOT"],
         ["head", "HEAD"],
-        ["eye", "EYE"]
+        ["eye", "EYE"],
+        ["hand (right)", "HAND_RIGHT"],
+        ["hand (left)", "HAND_LEFT"],
+        ["foot (right)", "FOOT_RIGHT"],
+        ["foot (left)", "FOOT_LEFT"]
       ]
     },
     {

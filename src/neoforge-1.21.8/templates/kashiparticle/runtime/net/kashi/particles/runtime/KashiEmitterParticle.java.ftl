@@ -306,9 +306,23 @@ public class KashiEmitterParticle extends Particle {
 		return aimQuaternion(look.x, look.y, look.z);
 	}
 
-	/** Which heading {@link #bindToAnchor}/{@link #followAnchor} track - see {@link #fullLookFrame}. */
+	/**
+	 * Which heading {@link #bindToAnchor}/{@link #followAnchor} track - see {@link #fullLookFrame}.
+	 * For a hand/foot attach point, tilts the look-based frame a bit further by
+	 * {@link KashiParticleAPI#resolveLimbSwingRadians}, so an effect attached there turns as the
+	 * limb swings (a punch, a walking stride) rather than only ever turning with the entity's own
+	 * look direction. {@code rotateX} post-multiplies, the same convention {@link #aimQuaternion}
+	 * already uses for yaw-then-pitch, so the limb tilt is applied in the frame already oriented by
+	 * the entity's look, not around a world-absolute axis. Every other attach point (and every
+	 * non-Attach spawn) gets {@code 0} back from {@code resolveLimbSwingRadians}, so this is a
+	 * no-op for them.
+	 */
 	private Quaternionf followFrame(net.minecraft.world.entity.Entity entity) {
-		return hasAttachPoint() ? fullLookFrame(entity) : yawFrame(entity);
+		if (!hasAttachPoint())
+			return yawFrame(entity);
+		float limbSwing = KashiParticleAPI.resolveLimbSwingRadians(entity, this.attachPoint);
+		Quaternionf frame = fullLookFrame(entity);
+		return limbSwing == 0 ? frame : frame.rotateX(limbSwing);
 	}
 
 	/**
