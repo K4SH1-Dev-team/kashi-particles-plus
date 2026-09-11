@@ -13,6 +13,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleRenderType;
+import net.minecraft.resources.ResourceLocation;
 
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -105,16 +106,21 @@ public class KashiEmitterParticle extends Particle {
 
 	private boolean expirationFired;
 
+	/** Which {@code (effectId, entityId)} to register under for "Stop K4SH1 Particle" - see {@link #remove()}. */
+	private final ResourceLocation originEffectId;
+	private final int originEntityId;
+
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor) {
-		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, 0, 0, "");
+		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, 0, 0, "", null, KashiParticleOptions.NO_ENTITY);
 	}
 
 	/** @param eventDepth how many chained events deep this emitter already is; 0 when fired directly */
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor,
 			int eventDepth) {
-		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, eventDepth, 0, 0, "");
+		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, eventDepth, 0, 0, "",
+				null, KashiParticleOptions.NO_ENTITY);
 	}
 
 	/**
@@ -124,22 +130,41 @@ public class KashiEmitterParticle extends Particle {
 	 * continuation of whatever offset the parent's spawn happened to carry), and an optional
 	 * attach point (see {@link #attachPoint}, empty for every spawn except "Attach K4SH1 Particle
 	 * to Entity").
+	 *
+	 * @param originEffectId,originEntityId the {@code (effectId, entityId)} this emitter registers
+	 *                                       itself under for "Stop K4SH1 Particle" to find later -
+	 *                                       see {@link #remove()}. Always the real spawn packet's
+	 *                                       own id/entity here, since this is the constructor
+	 *                                       {@code KashiParticleClient} calls directly.
 	 */
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor,
-			float scaleOffset, float durationOffset, String attachPoint) {
-		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, scaleOffset, durationOffset, attachPoint);
+			float scaleOffset, float durationOffset, String attachPoint,
+			ResourceLocation originEffectId, int originEntityId) {
+		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, scaleOffset, durationOffset, attachPoint,
+				originEffectId, originEntityId);
 	}
 
-	/** @param eventDepth how many chained events deep this emitter already is; 0 when fired directly */
+	/**
+	 * @param eventDepth                    how many chained events deep this emitter already is; 0
+	 *                                       when fired directly
+	 * @param originEffectId,originEntityId see the other constructor's doc comment; {@code null}/
+	 *                                       {@link KashiParticleOptions#NO_ENTITY} for an
+	 *                                       event-chained child, which is never independently
+	 *                                       targetable by Stop (see {@link #remove()}).
+	 */
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor,
-			int eventDepth, float scaleOffset, float durationOffset, String attachPoint) {
+			int eventDepth, float scaleOffset, float durationOffset, String attachPoint,
+			ResourceLocation originEffectId, int originEntityId) {
 		super(level, x, y, z);
 
 		this.scaleOffset = scaleOffset;
 
 		this.eventDepth = eventDepth;
+
+		this.originEffectId = originEffectId;
+		this.originEntityId = originEntityId;
 
 		this.attachPoint = attachPoint == null ? "" : attachPoint;
 
@@ -189,12 +214,32 @@ public class KashiEmitterParticle extends Particle {
 		this.nextLoopingTravel = d.emitterEvents().travelDistanceLoopingStep();
 
 		fireEvents(d.emitterEvents().creation());
+
+		// Only a directly-spawned emitter has an id to register under - see this field's own doc
+		// comment and the constructor javadocs above for why an event-chained child never does.
+		if (this.originEffectId != null)
+			KashiActiveParticles.track(this.originEffectId, this.originEntityId, this);
 	}
 
 	/** Runs named emitter events from this emitter's position, context and aim. */
 	private void fireEvents(java.util.List<String> names) {
 		KashiEventRunner.fire(this.effect, names, this.context, (ClientLevel) this.level,
 				this.x, this.y, this.z, this.dirX, this.dirY, this.dirZ, this.anchor, this.eventDepth);
+	}
+
+	/**
+	 * Covers every way this emitter can end - natural expiration ({@link #expire()}, which already
+	 * calls this), and an external "Stop K4SH1 Particle" force-stop ({@code KashiActiveParticles
+	 * #stopMatching} calls this directly). Untracking here rather than only in {@link #expire()}
+	 * means both paths - and any future one - stay correctly registered/unregistered with no extra
+	 * bookkeeping, the same idempotent-guard shape {@code KashiParticle#remove()} already uses.
+	 */
+	@Override
+	public void remove() {
+		if (this.originEffectId != null)
+			KashiActiveParticles.untrack(this.originEffectId, this.originEntityId, this);
+
+		super.remove();
 	}
 
 	/**
