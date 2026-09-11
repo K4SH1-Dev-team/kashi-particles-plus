@@ -266,6 +266,7 @@ public final class KashiParticleAPI {
 	private static final double SHOULDER_HEIGHT = 1.3;
 	private static final double ARM_WIDTH = 0.3;
 	private static final double ARM_LENGTH = 0.6;
+	private static final double ARM_DROP = 0.6; // how far a resting hand hangs below the shoulder
 	private static final double LEG_WIDTH = 0.15;
 	private static final double STRIDE_LENGTH = 0.3;
 	private static final float MAX_HAND_SWING = (float) Math.toRadians(60);
@@ -295,7 +296,8 @@ public final class KashiParticleAPI {
 		double side = (rightSide ? 1 : -1) * ARM_WIDTH; // right positive = the entity's actual right
 		double forward = anim.attack() * ARM_LENGTH
 				+ Math.sin(anim.swingPhase() * 0.6662) * anim.swingAmount() * 0.1; // walking sway
-		return entityFrameOffset(living, living.position(), side, SHOULDER_HEIGHT, forward);
+		double up = SHOULDER_HEIGHT - ARM_DROP * (1 - anim.attack()); // hangs at rest, rises into the punch
+		return entityFrameOffset(living, living.position(), side, up, forward);
 	}
 
 	/** Same approximation as {@link #resolveHand}, for a foot instead - see its doc comment. */
