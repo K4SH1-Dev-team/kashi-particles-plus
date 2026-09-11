@@ -2,6 +2,7 @@ package net.kashi.particles.runtime;
 
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.registries.RegisterEvent;
 
 import net.minecraft.core.registries.Registries;
@@ -40,5 +41,19 @@ public final class KashiParticlesRuntime {
 			type = new KashiParticleType();
 			return type;
 		});
+	}
+
+	/**
+	 * Registers the S2C "stop" packet. This runs on both physical sides (a {@code RegisterEvent}-
+	 * style mod-bus event fires on a dedicated server too), but {@link KashiParticleClient} — which
+	 * the handler defers to — is client-only. Wrapping the reference inside the
+	 * {@code context.enqueueWork} lambda keeps it unresolved until a packet actually arrives, which
+	 * only ever happens on a real client, so a dedicated server never loads that class.
+	 */
+	@SubscribeEvent
+	static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
+		event.registrar("1").playToClient(KashiStopParticlesPayload.TYPE, KashiStopParticlesPayload.STREAM_CODEC,
+				(payload, context) -> context.enqueueWork(
+						() -> KashiParticleClient.stopMatchingParticles(payload.effectId(), payload.entityId())));
 	}
 }

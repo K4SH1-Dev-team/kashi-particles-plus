@@ -1,5 +1,7 @@
 package net.kashi.particles.runtime;
 
+import net.neoforged.neoforge.network.PacketDistributor;
+
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
@@ -194,6 +196,26 @@ public final class KashiParticleAPI {
 
 		spawnKashiParticle(level, effectId, origin.x, origin.y, origin.z, aim.x, aim.y, aim.z,
 				entity.getId(), scaleOffset, durationOffset, attachPoint);
+	}
+
+	/**
+	 * Ends every currently-running instance of {@code effectId} owned by {@code entity} - a world/
+	 * entity/block spawn, or an attach, fired directly through this API (not one fired as another
+	 * effect's own chained event; see {@code KashiActiveParticles} for why). {@code entity == null}
+	 * targets every no-owner instance instead (world/block spawns), the same
+	 * {@code KashiParticleOptions.NO_ENTITY} sentinel those already spawn under.
+	 *
+	 * <p>Sends a new client-only packet ({@code KashiStopParticlesPayload}) rather than reusing
+	 * {@link ServerLevel#sendParticles} the way every spawn does, because there is no vanilla
+	 * "un-spawn a particle" concept to piggyback on; a dedicated client-side registry
+	 * ({@code KashiActiveParticles}) is what actually matches the id against live instances.
+	 */
+	public static void stopKashiParticle(Level level, Identifier effectId, Entity entity) {
+		int entityId = entity == null ? KashiParticleOptions.NO_ENTITY : entity.getId();
+
+		if (level instanceof ServerLevel serverLevel)
+			PacketDistributor.sendToPlayersInDimension(serverLevel,
+					new KashiStopParticlesPayload(effectId, entityId));
 	}
 
 	/**
