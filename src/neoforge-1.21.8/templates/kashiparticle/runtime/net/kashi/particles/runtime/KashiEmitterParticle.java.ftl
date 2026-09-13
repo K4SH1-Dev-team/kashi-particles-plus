@@ -238,16 +238,20 @@ public class KashiEmitterParticle extends Particle {
 	/**
 	 * Covers every way this emitter can end - natural expiration ({@link #expire()}, which calls
 	 * this), and an external "Stop K4SH1 Particle" force-stop ({@link #forceStop()}, which also
-	 * calls this). Untracking here rather than only in {@link #expire()} means every path - and
-	 * any future one - stays correctly registered/unregistered with no extra bookkeeping, the same
-	 * idempotent-guard shape {@code KashiParticle#remove()} already uses.
+	 * calls this).
+	 *
+	 * <p>Does NOT untrack while {@link #children} is non-empty - {@link #childDied} does that
+	 * instead, when the last one dies. An emitter's own {@code active_time} routinely ends well
+	 * before every particle it already spawned finishes fading (each has its own, often longer,
+	 * {@code max_lifetime}); without this, a Stop/Despawn arriving in that window would find
+	 * nothing tracked to act on, even with particles still visibly on screen.
 	 */
 	@Override
 	public void remove() {
-		if (this.originEffectId != null)
-			KashiActiveParticles.untrack(this.originEffectId, this.originEntityId, this);
-
 		super.remove();
+
+		if (this.originEffectId != null && this.children.isEmpty())
+			KashiActiveParticles.untrack(this.originEffectId, this.originEntityId, this);
 	}
 
 	/**
@@ -799,6 +803,12 @@ public class KashiEmitterParticle extends Particle {
 			this.alive--;
 
 		this.children.remove(child);
+
+		// This emitter already ended (see #remove()'s doc comment) but stayed tracked because this
+		// was its last live child - now that it's gone too, there is nothing left a Stop/Despawn
+		// could still act on, so actually untrack.
+		if (!this.isAlive() && this.children.isEmpty() && this.originEffectId != null)
+			KashiActiveParticles.untrack(this.originEffectId, this.originEntityId, this);
 	}
 
 	/**
