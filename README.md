@@ -17,7 +17,7 @@ engine.
 
 ## Status
 
-**v3.0.0** — production-ready. Targets **MCreator 2026.1.x** (NeoForge **1.21.1** or **1.21.8**) or
+**v4.0.0** — production-ready. Targets **MCreator 2026.1.x** (NeoForge **1.21.1** or **1.21.8**) or
 **MCreator 2026.2.x** (NeoForge **1.21.1**, **26.1.2** or **26.2**) - see
 [docs/ROADMAP.md](docs/ROADMAP.md) for what's next.
 
@@ -32,11 +32,16 @@ engine.
   curves (linear, catmull_rom, bezier, bezier_chain), local space (follow the entity that fired
   it), events (`particle_effect`, `sound_effect`, `expression`, `sequence`, `randomize`, `log`),
   flipbook animation, and colour gradients/expressions.
-- Three procedure blocks: spawn at a world position, spawn from an entity's feet (with a
-  local-frame offset and an aim mode), and spawn from a block. Aim mode controls how much of the
-  firing entity's look direction the effect inherits. Every block also takes optional additive
-  `scale` and `duration` offsets on top of what the effect authored — `0` (the default) always
-  leaves Snowstorm as the source of truth.
+- Six procedure blocks: spawn at a world position, spawn from an entity's feet (with a
+  local-frame offset and an aim mode), spawn from a block, attach to an entity so the effect keeps
+  following it every tick (root/body, head, eye, or a hand/foot that turns and swings with the
+  limb), and stop or despawn a running attached/entity-fired instance for a specific entity. Aim
+  mode controls how much of the firing entity's look direction an effect inherits. Every spawn/
+  attach block also takes optional additive `scale` and `duration` offsets on top of what the
+  effect authored — `0` (the default) always leaves Snowstorm as the source of truth.
+- Stop ends an effect's emitter and lets whatever it already spawned fade out naturally; Despawn
+  does the same but also clears every particle already on screen instantly. Both target one
+  entity's own running instance of an effect.
 - Reliable at range and in multiplayer: a fired effect broadcasts to every player within 512
   blocks, not just the one who fired it.
 - A self-contained MoLang expression compiler and evaluator (`core/`) — no GeckoLib dependency,
@@ -73,12 +78,17 @@ engine.
 3. If the effect references other effects through its events (a hit effect that also plays a
    sound-trail effect, for instance), import those too — an effect that isn't imported simply
    doesn't play when referenced, silently.
-4. Use one of the three **KASHI Particles** procedure blocks to fire it:
+4. Use one of the **KASHI Particles** procedure blocks to fire it:
    - **Spawn KASHI Particle at x/y/z** — world position, authored orientation. Best for area
      effects.
    - **Spawn KASHI Particle from entity** — from the entity's feet, with a local-frame offset
      (`forward`/`right`/`up`) and an **aim** mode (full look, yaw-only, or none).
    - **Spawn KASHI Particle from block** — at the centre of a block.
+   - **Attach KASHI Particle to entity** — keeps the effect following the entity every tick,
+     anchored at its root/body, head, eye, or a hand/foot that turns and swings with the limb.
+   - **Stop KASHI Particle** / **Despawn KASHI Particle** — ends a running instance that a Spawn
+     from entity or Attach block started for a specific entity; Despawn also clears whatever is
+     already on screen instantly instead of letting it fade out.
 
 See [docs/USAGE.md](docs/USAGE.md) for the full block reference, aim-mode semantics, and
 performance guidance for firing many effects at once.
