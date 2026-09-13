@@ -5,10 +5,10 @@
 	KashiParticleAPI.despawnKashiParticle also removes every particle already spawned, instead of
 	letting them fade out the way Stop does. See despawnKashiParticle's own doc comment.
 
-	entity is deliberately left unconnected by default (see despawn_kashi_particle.json's
-	toolbox_init) for the same reason as the Stop block - "no entity" is a valid, common target
-	(despawning a world/block spawn), not a missing value to guard against. input$entity!"null"
-	is the same FreeMarker fallback stop_kashi_particle.java.ftl already uses.
+	entity comes pre-filled with entity_from_deps (see despawn_kashi_particle.json's toolbox_init),
+	same as the Stop block - but can also be disconnected on purpose: "no entity" is a valid,
+	common target (despawning a world/block spawn), not a missing value to guard against.
+	input$entity!"null" is the same FreeMarker fallback stop_kashi_particle.java.ftl already uses.
 
 	The effect id transform below MUST stay byte-for-byte identical to the same line in this
 	generator's own entity_attach_kashi_particle.java.ftl/stop_kashi_particle.java.ftl (and the
