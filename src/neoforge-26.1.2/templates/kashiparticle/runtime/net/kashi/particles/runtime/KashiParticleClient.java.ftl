@@ -89,7 +89,11 @@ public final class KashiParticleClient {
 	}
 
 	/** "Stop K4SH1 Particle" reaching the client - see {@code KashiParticlesRuntime#onRegisterPayloads}. */
-	public static void stopMatchingParticles(net.minecraft.resources.Identifier effectId, int entityId) {
-		KashiActiveParticles.stopMatching(effectId, entityId);
+	public static void stopMatchingParticles(net.minecraft.resources.Identifier effectId, int entityId,
+			boolean despawn) {
+		if (despawn)
+			KashiActiveParticles.despawnMatching(effectId, entityId);
+		else
+			KashiActiveParticles.stopMatching(effectId, entityId);
 	}
 }

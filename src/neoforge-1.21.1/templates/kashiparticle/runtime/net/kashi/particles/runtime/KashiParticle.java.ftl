@@ -754,7 +754,7 @@ public class KashiParticle extends Particle {
 		// are alive rather than how many were ever spawned.
 		if (!this.releasedSlot) {
 			this.releasedSlot = true;
-			this.emitter.childDied();
+			this.emitter.childDied(this);
 		}
 
 		super.remove();

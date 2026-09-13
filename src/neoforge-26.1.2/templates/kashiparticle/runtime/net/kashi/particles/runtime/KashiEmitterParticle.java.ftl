@@ -92,6 +92,14 @@ public class KashiEmitterParticle extends Particle {
 	/** Particles currently alive. Bedrock's max_particles is a concurrent cap, not a total. */
 	private int alive;
 
+	/**
+	 * Every currently-visible child this emitter spawned, so an external "Stop K4SH1 Particle"
+	 * can kill them all instantly - see {@link #forceStop()}. Nothing else reads this list; a
+	 * natural end ({@link #expire()}, or any other removal) only stops the emitter and leaves
+	 * already-flying particles to finish their own lifetime, same as Bedrock itself does.
+	 */
+	private final java.util.List<KashiParticle> children = new java.util.ArrayList<>();
+
 	// --- events ---
 
 	private final int eventDepth;
@@ -228,11 +236,11 @@ public class KashiEmitterParticle extends Particle {
 	}
 
 	/**
-	 * Covers every way this emitter can end - natural expiration ({@link #expire()}, which already
-	 * calls this), and an external "Stop K4SH1 Particle" force-stop ({@code KashiActiveParticles
-	 * #stopMatching} calls this directly). Untracking here rather than only in {@link #expire()}
-	 * means both paths - and any future one - stay correctly registered/unregistered with no extra
-	 * bookkeeping, the same idempotent-guard shape {@code KashiParticle#remove()} already uses.
+	 * Covers every way this emitter can end - natural expiration ({@link #expire()}, which calls
+	 * this), and an external "Stop K4SH1 Particle" force-stop ({@link #forceStop()}, which also
+	 * calls this). Untracking here rather than only in {@link #expire()} means every path - and
+	 * any future one - stays correctly registered/unregistered with no extra bookkeeping, the same
+	 * idempotent-guard shape {@code KashiParticle#remove()} already uses.
 	 */
 	@Override
 	public void remove() {
@@ -240,6 +248,26 @@ public class KashiEmitterParticle extends Particle {
 			KashiActiveParticles.untrack(this.originEffectId, this.originEntityId, this);
 
 		super.remove();
+	}
+
+	/**
+	 * What an external "Stop K4SH1 Particle" call does to this emitter - see {@code
+	 * KashiActiveParticles#stopMatching}, the only caller. Fires the effect's authored "on
+	 * expiration" events the same way a natural {@link #expire()} does (from the effect's own
+	 * point of view, being told to stop and running out are the same "I'm ending" moment), but
+	 * unlike a natural expiration - or removal for any other reason - also kills every
+	 * currently-visible child particle already spawned, not just the (invisible) emitter driving
+	 * them. A natural end leaves already-flying particles to finish their own lifetime, matching
+	 * Bedrock's own behaviour; an explicit Stop is a deliberate, user-visible cutoff instead, so it
+	 * clears the effect instantly rather than leaving a fade-out behind.
+	 */
+	void forceStop() {
+		expire();
+
+		// A copy: KashiParticle#remove() calls back into childDied(), which would otherwise mutate
+		// this same list mid-iteration.
+		for (KashiParticle child : java.util.List.copyOf(this.children))
+			child.remove();
 	}
 
 	/**
@@ -641,6 +669,7 @@ public class KashiEmitterParticle extends Particle {
 		KashiParticle particle = new KashiParticle((ClientLevel) this.level, px, py, pz, this,
 				this.effect, spawnContext, dir.x(), dir.y(), dir.z(), this.scaleOffset);
 
+		this.children.add(particle);
 		Minecraft.getInstance().particleEngine.add(particle);
 	}
 
@@ -765,9 +794,11 @@ public class KashiEmitterParticle extends Particle {
 	}
 
 	/** One child died; free its slot so a steady emitter can top the effect back up. */
-	void childDied() {
+	void childDied(KashiParticle child) {
 		if (this.alive > 0)
 			this.alive--;
+
+		this.children.remove(child);
 	}
 
 	/**

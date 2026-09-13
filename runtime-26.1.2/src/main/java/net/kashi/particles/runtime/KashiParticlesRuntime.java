@@ -53,7 +53,7 @@ public final class KashiParticlesRuntime {
 	@SubscribeEvent
 	static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
 		event.registrar("1").playToClient(KashiStopParticlesPayload.TYPE, KashiStopParticlesPayload.STREAM_CODEC,
-				(payload, context) -> context.enqueueWork(
-						() -> KashiParticleClient.stopMatchingParticles(payload.effectId(), payload.entityId())));
+				(payload, context) -> context.enqueueWork(() -> KashiParticleClient.stopMatchingParticles(
+						payload.effectId(), payload.entityId(), payload.despawn())));
 	}
 }

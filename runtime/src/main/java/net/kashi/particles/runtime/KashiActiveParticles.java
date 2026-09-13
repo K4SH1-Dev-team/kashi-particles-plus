@@ -58,7 +58,11 @@ final class KashiActiveParticles {
 			ACTIVE.remove(key);
 	}
 
-	/** Ends every currently-tracked instance matching {@code effectId} owned by {@code entityId}. */
+	/**
+	 * "Stop K4SH1 Particle" - ends the emitter matching {@code effectId}/{@code entityId} the same
+	 * way a natural expiration would: no more new particles, but everything already spawned keeps
+	 * fading out on its own. See {@link #despawnMatching} for the instant-cutoff variant.
+	 */
 	static void stopMatching(ResourceLocation effectId, int entityId) {
 		List<KashiEmitterParticle> hit = ACTIVE.get(new Key(effectId, entityId));
 
@@ -69,6 +73,23 @@ final class KashiActiveParticles {
 		// same list mid-iteration.
 		for (KashiEmitterParticle particle : List.copyOf(hit))
 			particle.remove();
+	}
+
+	/**
+	 * "Despawn K4SH1 Particle" - a full, instant cutoff via {@link KashiEmitterParticle#forceStop()}:
+	 * ends the emitter AND removes every particle it already spawned, rather than letting them fade
+	 * out the way {@link #stopMatching} does.
+	 */
+	static void despawnMatching(ResourceLocation effectId, int entityId) {
+		List<KashiEmitterParticle> hit = ACTIVE.get(new Key(effectId, entityId));
+
+		if (hit == null)
+			return;
+
+		// A copy: KashiEmitterParticle#remove() untracks itself, which would otherwise mutate this
+		// same list mid-iteration.
+		for (KashiEmitterParticle particle : List.copyOf(hit))
+			particle.forceStop();
 	}
 
 	/**
