@@ -2,13 +2,15 @@
 
 ## Onde estamos
 
-**v3.0.0** publicado ([Releases](https://github.com/K4SH1-Dev-team/kashi-particles-plus/releases))
+**v4.0.0** publicado ([Releases](https://github.com/K4SH1-Dev-team/kashi-particles-plus/releases))
 — paridade completa com o Snowstorm 3.2.2 para o formato `.particle.json`, endurecido para uso em
 produção em workspaces diferentes da de desenvolvimento, escala/duração aditivos e broadcast
 confiável em multiplayer (v2.0.0), suporte ao gerador NeoForge 1.21.8 lado a lado com o 1.21.1
-(v2.5.0), duas correções de estabilização descobertas em build real no MCreator (v2.5.1), e porte
+(v2.5.0), duas correções de estabilização descobertas em build real no MCreator (v2.5.1), porte
 completo para o MCreator 2026.2 com suporte a **dois novos geradores** (NeoForge 26.1.2 e 26.2)
-lado a lado com o 1.21.1/1.21.8 (v3.0.0). Ver histórico completo abaixo.
+lado a lado com o 1.21.1/1.21.8 (v3.0.0), e três blocos novos — **Attach K4SH1 Particle to
+Entity**, **Stop K4SH1 Particle** e **Despawn K4SH1 Particle** — fechando a lista de ideias
+original do usuário (v4.0.0). Ver histórico completo abaixo.
 
 ## Próximas fases
 
@@ -40,24 +42,8 @@ Descartado ou adiado desta lista, com o motivo:
 - **Distância máxima configurável** — descartada: o pedido real era garantia de visibilidade a
   longa distância, resolvido pela correção do broadcast acima; nenhum teto novo era necessário.
 - **Set K4SH1 Particle Variable** — descartado pelo usuário ("não estou achando muito útil").
-- **Stop K4SH1 Particle** e **Attach K4SH1 Particle to entity** — ver "Ideias futuras" abaixo.
-
-### Ideias futuras (validadas, não implementadas)
-
-- **Stop K4SH1 Particle** — parar uma instância em execução (ex.: uma aura). Precisa de um sistema
-  de ID de instância e de um pacote de rede próprio do plugin — hoje todo spawn pega carona no
-  pacote nativo de partícula do Minecraft, que não tem conceito de "parar depois". É o maior dos
-  dois em esforço.
-- **Attach K4SH1 Particle to entity** — prender um efeito a uma entidade em vez de a uma posição
-  fixa, para que ele a acompanhe (aura, energia na mão, fogo nos pés). Escopo inicial acordado:
-  **vanilla apenas, sem GeckoLib** — Player e entidades biped vanilla (zumbis, esqueletos) e o
-  modelo biped padrão do MCreator. Pontos de ancoragem: raiz/corpo, cabeça, **olho**, braço/mão,
-  perna/pé. Raiz/corpo/cabeça/olho é esforço baixo (a mesma máquina de `emitter_local_space` já
-  existente, só ancorando num offset da entidade em vez de world-space). Braço/mão e perna/pé é
-  esforço moderado (aproximar a pose de `HumanoidModel` via `entity.getAttackAnim(partialTick)` /
-  `entity.walkAnimation`, API pública e estável do próprio Minecraft — sem precisar de GeckoLib
-  nem mexer em internals de render). Suporte a GeckoLib, Player Animator e entidades não-biped
-  fica para avaliação futura separada, possivelmente descartado.
+- **Stop K4SH1 Particle** e **Attach K4SH1 Particle to entity** — ambos implementados, ver
+  "V4.0.0" abaixo.
 
 ### V2.5 — Porte para NeoForge 1.21.8 (concluída)
 O MCreator 2026.1.x já oferece o gerador NeoForge 1.21.8 além do 1.21.1; o plugin agora suporta os
@@ -199,6 +185,98 @@ Testado pelo usuário nas 5 workspaces com build Gradle real: `kashi_particle_te
 e `true_particle_test` (1.21.1/1.21.8, já validados na v2.5/v2.5.1) e `seis_um`/`seis_dois`
 (26.1.2/26.2, novos) — os 4 modos de blend (ADD/ALPHA/CUTOUT — não existe exemplo OPAQUE no pack
 de prova) corretos nas 5.
+
+### V4.0.0 — Attach, Stop e Despawn K4SH1 Particle (concluída)
+
+As duas últimas ideias validadas da lista original (`Spawn`/`Play`/`Stop`/`Attach`/`Set Variable`)
+— nesta versão o escopo acabou se dividindo em três blocos novos: Attach, Stop e Despawn.
+
+#### Attach K4SH1 Particle to Entity
+
+Prende um efeito a uma entidade em vez de a uma posição fixa, pra ele acompanhá-la (aura, fogo nos
+pés, energia na mão). Escopo acordado desde o início: só vanilla, sem GeckoLib — Player e bipeds
+vanilla (zumbi, esqueleto) + o modelo biped padrão do MCreator.
+
+**Etapa A (root/body, head, eye)** — esforço baixo, reaproveitando a máquina de
+`emitter_local_space` já existente, só ancorando num offset da entidade em vez de world-space. Um
+único método compartilhado (`KashiParticleAPI.resolveAttachPoint`) resolve a posição dos 3 pontos,
+chamado tanto no spawn inicial (que pode rodar no servidor) quanto no rastreio por tick
+(client-only) — os dois nunca discordam sobre onde um ponto está. Rotação (yaw+pitch, "full look")
+vive só no cliente, num método separado (`KashiEmitterParticle.followFrame`), reaproveitado depois
+pela Etapa B.
+
+Testado pelo usuário: a rotação de Head/Eye/Body pareceu não se mover a princípio ("não moveu") —
+na investigação, a matemática de rotação (yaw+pitch, `aimQuaternion`) já estava correta desde o
+início; era um artefato de visibilidade (o offset testado era pequeno demais pra notar a mudança
+de ângulo a olho). Confirmado com um offset maior: "Sim, moveu". Nenhum bug de fato, só limpeza do
+logging de diagnóstico temporário usado pra investigar (nunca chegou a ser commitado).
+
+**Etapa B (braço/mão, perna/pé)** — esforço moderado, usando `entity.getAttackAnim`/
+`entity.walkAnimation` (API pública e estável do próprio Minecraft, confirmada rodar igual em
+servidor e cliente via decompilação real dos dois extremos de gerador — sem risco de "salto" no
+primeiro frame). Requisito adicional do usuário durante o design: o efeito deve **rotacionar**
+junto com o membro, não só mudar de posição — um soco deve inclinar um efeito na mão, uma passada
+deve balançar um efeito no pé. Implementado como uma função de ângulo extra
+(`resolveLimbSwingRadians`) que inclina o mesmo frame de rotação da Etapa A.
+
+Bug real encontrado em teste: a mão renderizava presa na altura do ombro (`SHOULDER_HEIGHT`)
+constante, independente da animação — inclusive parada, sem socar. Corrigido fazendo a altura
+variar com `attack()` do mesmo jeito que o avanço (`forward`) já variava: pendura abaixo do ombro
+em repouso (nova constante `ARM_DROP`), sobe até a altura do ombro num soco totalmente estendido.
+
+#### Stop / Despawn K4SH1 Particle
+
+A ideia original ("Stop") assumia precisar de um sistema de ID de instância e um pacote de rede
+próprio — nenhum dos dois existia no plugin até aqui (todo spawn até então pegava carona no pacote
+nativo de partícula do Minecraft). Decisão de design, confirmada com o usuário via duas perguntas
+diretas: alvo por **entidade + efeito** (não um ID de instância novo — mais simples, evita reabrir
+o território de "Set K4SH1 Particle Variable", já rejeitado antes), reaproveitando o mesmo
+sentinela `NO_ENTITY` que `KashiParticleOptions` já carrega em todo spawn.
+
+Implementado: um pacote S2C novo (`KashiStopParticlesPayload`), um registro client-only de
+instâncias vivas (`KashiActiveParticles`, chaveado por efeito+entidade), e um novo método em
+`KashiEmitterParticle` pra encerrar externamente. Só o emissor direto de um Spawn/Attach se
+registra — um efeito disparado como evento encadeado de outro efeito nunca teve um id próprio pra
+registrar, e nunca foi selecionável via bloco de qualquer forma.
+
+Três bugs reais encontrados só em teste de verdade (nenhum pego por inspeção estática nem pelos
+scripts de build):
+
+- **No-op quando a procedure roda no lado cliente**: `stopKashiParticle` só tinha o ramo servidor
+  (mandar o pacote) — ao contrário de `spawnKashiParticle`, que já tem um `else` pro caso
+  client-side. Se a procedure que chama Stop roda no cliente (alguns tipos de gatilho do MCreator
+  rodam), a chamada não fazia nada, silenciosamente. Corrigido espelhando o mesmo split
+  client/servidor que o spawn já tinha.
+- **Stop sozinho não bastava pro que o usuário queria**: Stop só encerra o emissor (para de nascer
+  partícula nova) — o que já existia (partículas visíveis já lançadas têm vida própria e continuam
+  na tela até acabar sozinhas, igual a uma expiração natural). Pra um efeito curto ou denso isso
+  parece "não fez nada". Em vez de mudar a semântica do Stop (correta nos próprios termos), virou
+  um segundo bloco: **Despawn K4SH1 Particle** — mesmo alvo, corte total e instantâneo, removendo
+  também toda partícula já nascida.
+- **Despawn não achava nada pra matar quando o emissor já tinha acabado sozinho**: o `active_time`
+  do emissor termina bem antes das partículas que ele já lançou acabarem de sumir (`max_lifetime`
+  próprio, geralmente mais longo) — e o emissor se desregistrava do rastreamento assim que
+  terminava, então um Despawn chegando nessa janela não achava mais nada, mesmo com partículas
+  visíveis na tela. Corrigido adiando o desregistro: o emissor só sai do registro quando ele mesmo
+  já acabou **e** não sobra mais nenhuma partícula filha viva — o que vier por último.
+
+Ajuste de UX pós-teste: os dois blocos vêm com a entrada `entity` já preenchida com
+`entity_from_deps` por padrão (igual a Attach e Spawn from entity), já que o uso pretendido é
+sempre mirar uma entidade específica — spawn de mundo/bloco (sem dono) fica fora do escopo de
+Stop/Despawn por enquanto.
+
+Todos os achados desta seção só apareceram em teste real dentro do jogo, com logging de
+diagnóstico temporário adicionado e removido a cada rodada — nenhum foi visível por inspeção
+estática nem pego pelos scripts de build (`check-mod-compile.ps1` nunca roda o FreeMarker de
+verdade contra um bloco real de uma workspace).
+
+#### Uma pegadinha de merge, duas vezes
+
+Nas duas vezes em que uma PR desta versão foi mesclada (Etapa B do Attach, e depois Stop/Despawn),
+o merge capturou a branch num ponto anterior a um commit de correção que ainda estava sendo
+empurrado — o `main` ficou sem a correção mais recente até uma segunda PR trazer só os commits que
+faltavam. Vale sempre conferir o `headRefOid` de um PR mesclado contra o HEAD real da branch antes
+de dar uma feature por encerrada.
 
 ---
 

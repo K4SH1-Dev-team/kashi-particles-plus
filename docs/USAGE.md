@@ -29,7 +29,7 @@ texture — an incomplete KASHI Particle element can't make it into the workspac
 
 ## Firing an effect
 
-Three procedure blocks, all under the **KASHI Particles** category:
+Six procedure blocks, all under the **KASHI Particles** category:
 
 ### Spawn KASHI Particle at x / y / z
 
@@ -79,6 +79,46 @@ Same `scale` / `duration` additive offsets as the world-position block above, bo
 Fires at the centre of a block. Same `direction x/y/z` as the world-position block above — zero
 keeps the authored world orientation, non-zero turns the effect to face that way. Same `scale` /
 `duration` additive offsets too, both defaulting to `0` (no change).
+
+### Attach KASHI Particle to entity
+
+Keeps the effect following the entity every tick — position **and** rotation both — instead of
+spawning once at a fixed position the way the blocks above do. Good for an aura, fire on the feet,
+energy in a hand that turns with the arm.
+
+- `attach` — which point on the entity to anchor to:
+  - **root/body**, **head**, **eye** — exact, tracks the entity itself.
+  - **hand (right)** / **hand (left)** / **foot (right)** / **foot (left)** — a visually-tuned
+    approximation driven by attack/walk animation, not a real bone lookup: a punch tips a
+    hand-anchored effect forward, a stride swings a foot-anchored one along with the leg. Falls
+    back to root/body for anything that isn't a living, biped-shaped entity (a dropped item, for
+    instance).
+- `right` / `up` / `forward` and `aim` work exactly like **Spawn KASHI Particle from entity**
+  above, just measured from the chosen point instead of always the feet (`up: 0` lands right on
+  that point). Rotation follows the *full* look direction — pitch included — so an offset on a
+  head/eye anchor swings up and down as the entity looks up and down, not just side to side.
+- Same `scale` / `duration` additive offsets as every spawn block above, both defaulting to `0`.
+
+Like every KASHI spawn, this is still fire-and-forget: an attached looping effect ends on its own
+after at most 30 seconds of following, even though it kept tracking the entity right up until
+then. Use **Stop** or **Despawn** below to end one earlier.
+
+### Stop / Despawn KASHI Particle
+
+Ends a running effect that **Spawn KASHI Particle from entity** or **Attach KASHI Particle to
+entity** started for a specific entity. The `entity` input comes pre-filled with
+`entity_from_deps`, same as those two blocks, since targeting that entity's own instance is the
+intended use — a world or block spawn has no owning entity, so it isn't reachable by either block.
+
+- **Stop KASHI Particle** — ends the emitter (no more new particles), but lets everything it
+  already spawned fade out on its own, the same as if the effect had simply run its course.
+- **Despawn KASHI Particle** — a full, instant cutoff: ends the emitter **and** immediately
+  removes every particle it already spawned, so the effect disappears completely the moment this
+  runs instead of fading out.
+
+Neither reaches an effect fired as another effect's own chained event (its Bedrock file spawning a
+second effect on impact, for example) — only an effect a Spawn-from-entity/Attach block started
+directly can be stopped or despawned.
 
 ## Performance: firing many effects at once
 
