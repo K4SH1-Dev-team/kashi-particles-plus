@@ -203,17 +203,49 @@ public final class KashiParticleAPI {
 	 * targets every no-owner instance instead (world/block spawns), the same
 	 * {@code KashiParticleOptions.NO_ENTITY} sentinel those already spawn under.
 	 *
-	 * <p>Sends a new client-only packet ({@code KashiStopParticlesPayload}) rather than reusing
-	 * {@link ServerLevel#sendParticles} the way every spawn does, because there is no vanilla
-	 * "un-spawn a particle" concept to piggyback on; a dedicated client-side registry
-	 * ({@code KashiActiveParticles}) is what actually matches the id against live instances.
+	 * <p>Stops the emitter the same way a natural expiration would: no more new particles, but
+	 * everything it already spawned keeps fading out on its own. See {@link #despawnKashiParticle}
+	 * for a full, instant cutoff instead.
 	 */
 	public static void stopKashiParticle(Level level, ResourceLocation effectId, Entity entity) {
+		sendStopPacket(level, effectId, entity, false);
+	}
+
+	/**
+	 * As {@link #stopKashiParticle}, but also removes every particle the matching instance(s)
+	 * already spawned instead of letting them fade out - a full, instant cutoff rather than just
+	 * ending the (invisible) emitter that was still spawning more.
+	 */
+	public static void despawnKashiParticle(Level level, ResourceLocation effectId, Entity entity) {
+		sendStopPacket(level, effectId, entity, true);
+	}
+
+	/**
+	 * Shared by {@link #stopKashiParticle} and {@link #despawnKashiParticle} - sending and matching
+	 * are identical between the two; only which {@code KashiActiveParticles} method the client ends
+	 * up calling differs, carried as {@code despawn} in the packet itself
+	 * ({@code KashiStopParticlesPayload}).
+	 *
+	 * <p>Sends a new packet rather than reusing {@link ServerLevel#sendParticles} the way every
+	 * spawn does, because there is no vanilla "un-spawn a particle" concept to piggyback on; a
+	 * dedicated client-side registry ({@code KashiActiveParticles}) is what actually matches the id
+	 * against live instances.
+	 *
+	 * <p>Mirrors {@link #spawnKashiParticle}'s own client/server split: on the server, broadcasts to
+	 * every player in the dimension, same as every spawn. When {@code level} is not a
+	 * {@link ServerLevel} - a procedure that runs client-side, as some trigger types do - this runs
+	 * on an actual client already, so it acts on the matching instances directly instead of sending
+	 * a packet nobody would answer. This branch can only ever run on a real client: a dedicated
+	 * server has no {@code Level} that is not a {@link ServerLevel}.
+	 */
+	private static void sendStopPacket(Level level, ResourceLocation effectId, Entity entity, boolean despawn) {
 		int entityId = entity == null ? KashiParticleOptions.NO_ENTITY : entity.getId();
 
 		if (level instanceof ServerLevel serverLevel)
 			PacketDistributor.sendToPlayersInDimension(serverLevel,
-					new KashiStopParticlesPayload(effectId, entityId));
+					new KashiStopParticlesPayload(effectId, entityId, despawn));
+		else
+			KashiParticleClient.stopMatchingParticles(effectId, entityId, despawn);
 	}
 
 	/**

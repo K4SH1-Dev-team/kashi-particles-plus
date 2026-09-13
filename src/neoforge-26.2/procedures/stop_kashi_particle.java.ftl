@@ -4,14 +4,14 @@
 	NO_ENTITY sentinel when entity is left unconnected, and why an event-chained child effect is
 	never reachable this way).
 
-	entity is deliberately left unconnected by default (see stop_kashi_particle.json's
-	toolbox_init, which - unlike entity_attach_kashi_particle.json's - has no entry for it): "no
-	entity" is itself a valid, common target (stopping a world/block spawn), not a missing value to
-	guard against. The input$entity!"null" fallback below is the same FreeMarker mechanism
-	entity_attach_kashi_particle.java.ftl already uses for scale/duration (there, for saved-block
-	back-compat; here, because the socket starts empty on purpose) - it renders the literal Java
-	null, which stopKashiParticle already treats as "no owning entity", the same way
-	spawnFromEntity/attachToEntity already treat a null entity input.
+	entity comes pre-filled with entity_from_deps (see stop_kashi_particle.json's toolbox_init),
+	same as the other entity-taking blocks - but unlike those, it can also be disconnected on
+	purpose: "no entity" is itself a valid, common target (stopping a world/block spawn), not a
+	missing value to guard against. The input$entity!"null" fallback below is the same FreeMarker
+	mechanism entity_attach_kashi_particle.java.ftl already uses for scale/duration (there, for
+	saved-block back-compat; here, for a block whose entity socket was deliberately emptied) - it
+	renders the literal Java null, which stopKashiParticle already treats as "no owning entity",
+	the same way spawnFromEntity/attachToEntity already treat a null entity input.
 
 	The effect id transform below MUST stay byte-for-byte identical to the same line in this
 	generator's own entity_attach_kashi_particle.java.ftl (and the other 3 generators' copies of

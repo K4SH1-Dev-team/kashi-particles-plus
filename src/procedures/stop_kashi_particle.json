@@ -18,7 +18,9 @@
   "colour": 150,
   "mcreator": {
     "toolbox_id": "kashiparticles",
-    "toolbox_init": [],
+    "toolbox_init": [
+      "<value name=\"entity\"><block type=\"entity_from_deps\"></block></value>"
+    ],
     "fields": [
       "effect"
     ],
