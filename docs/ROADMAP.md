@@ -278,6 +278,49 @@ empurrado — o `main` ficou sem a correção mais recente até uma segunda PR t
 faltavam. Vale sempre conferir o `headRefOid` de um PR mesclado contra o HEAD real da branch antes
 de dar uma feature por encerrada.
 
+### V4.0.1 — Attach respeita o aim (concluída)
+
+Versão de correção sobre a 4.0.0, achada ao montar um efeito de "energia na mão" (o charge de um
+Kamehameha) num mod de verdade, não por inspeção estática. O `plugin.json` tinha ficado em `3.0.0`
+na 4.0.0 (o commit de bump não foi feito); esta versão também corrige isso.
+
+#### O `aim` do Attach só valia no instante do spawn
+
+O dropdown `aim` decidia como o efeito era virado quando nascia; depois disso o emissor seguia
+sempre o olhar completo (yaw e pitch) e girava o offset em torno dos **pés** (`followFrame()` em
+`KashiEmitterParticle`), qualquer que fosse o modo escolhido. Um offset `up` num anchor root
+(energia na altura do quadril, uma aura no peito) balançava em arco toda vez que a entidade olhava
+pra cima ou pra baixo, mesmo com "turns with entity, stays level" selecionado.
+
+Agora o modo viaja com o spawn (`aimMode` em `KashiParticleOptions.Extras`, opcional no codec,
+padrão `FULL`) e escolhe o referencial que o emissor segue: `FULL` segue yaw e pitch (como antes),
+`HORIZONTAL` só o yaw, `NONE` mantém os eixos do mundo e só acompanha a posição. `FULL` é o padrão,
+então não muda nada pra quem já o usava; quem tinha `HORIZONTAL` ou `NONE` num Attach passa a ver o
+efeito parar de inclinar com o pitch, que é o que o dropdown já descrevia. Aplicado nas 4 variantes
+de runtime (PR #33).
+
+#### Duas pegadinhas achadas no caminho
+
+- **`emitter_local_space.velocity: true` faz as partículas herdarem o movimento da entidade**
+  (`inheritedVelocity()` = `getDeltaMovement() × 20`). Em pé no chão o jogador tem velocidade
+  vertical de ≈ −0,078/tick (a gravidade empurrando contra o piso), ≈ −1,57 blocos/s: um efeito
+  anexado afunda no chão, enquanto voando a velocidade é 0 e ele fica parado — o sintoma "funciona no
+  ar, afunda no chão". Pra efeitos presos a uma entidade o mais seguro é `velocity: false` no JSON
+  (a posição já é seguida pelo emissor). Sem mudança de código: a herança é intencional (ver o
+  comentário em `followAnchor()`), só ficou registrada aqui.
+- **`check-mod-compile.ps1` não funcionava fora da máquina que construiu as workspaces**: os
+  arquivos de classpath em cache guardam caminhos absolutos do cache do Gradle de quem construiu, e
+  em outro perfil de usuário todo jar "não existia" — centenas de erros `package ... does not exist`
+  e nenhum erro real visível (o `javac` nem checa tipos quando um import não resolve). Foi assim
+  que um construtor esquecido no primeiro patch do Attach só apareceu no Build real do MCreator.
+  Agora o script mapeia cada entrada pro cache local, nunca troca o jar do NeoForge (pula o
+  workspace com o motivo) e termina listando o que foi checado e o que foi pulado (PR #34).
+
+Testado: Build e jogo num mod real (workspace do Animeverse, NeoForge 26.2). Compilação via
+`check-mod-compile.ps1`: 1.21.1 (MCreator 2026.1 e 2026.2), 1.21.8 e 26.2; o 26.1.2 não foi
+compilado (o NeoForge 26.1.2.95 não está no cache da máquina de teste), mas as linhas alteradas em
+`runtime-26.1.2` são idênticas às de `runtime-26.2`. Testes do core: 103 checagens sob JDK 21 e 25.
+
 ---
 
 ## Histórico: o plano de paridade Snowstorm
