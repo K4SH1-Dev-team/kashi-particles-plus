@@ -61,6 +61,15 @@ public record KashiParticleOptions(Identifier effectId, float dirX, float dirY, 
 	}
 
 	/**
+	 * How an Attach spawn keeps following its entity: {@code FULL}, {@code HORIZONTAL} or
+	 * {@code NONE} - see {@code KashiParticleAPI#AIM_FULL}. {@code FULL} for every other spawn, where
+	 * it is never consulted.
+	 */
+	public String aimMode() {
+		return this.extras.aimMode();
+	}
+
+	/**
 	 * Additive scale/duration offsets a spawn can apply on top of what the effect authored in
 	 * Snowstorm, plus the attach point for "Attach K4SH1 Particle to Entity". The offsets default
 	 * to {@code 0}, which is a no-op — per the plugin's governing rule, an unfilled offset always
@@ -73,16 +82,19 @@ public record KashiParticleOptions(Identifier effectId, float dirX, float dirY, 
 	 *                       new particles) - not to any individual particle's {@code max_lifetime}
 	 * @param attachPoint    {@code "ROOT"}, {@code "HEAD"} or {@code "EYE"} - see
 	 *                       {@code KashiEmitterParticle#resolveAnchorPosition()}
+	 * @param aimMode        {@code FULL}, {@code HORIZONTAL} or {@code NONE}: which part of the entity's
+	 *                       look an Attach spawn keeps following (see {@code KashiEmitterParticle#followFrame})
 	 */
-	public record Extras(float scaleOffset, float durationOffset, String attachPoint) {
+	public record Extras(float scaleOffset, float durationOffset, String attachPoint, String aimMode) {
 
-		public static final Extras NONE = new Extras(0, 0, "");
+		public static final Extras NONE = new Extras(0, 0, "", "FULL");
 
 		static final StreamCodec<net.minecraft.network.FriendlyByteBuf, Extras> STREAM_CODEC =
 				StreamCodec.composite(
 						ByteBufCodecs.FLOAT, Extras::scaleOffset,
 						ByteBufCodecs.FLOAT, Extras::durationOffset,
 						ByteBufCodecs.stringUtf8(32), Extras::attachPoint,
+						ByteBufCodecs.stringUtf8(16), Extras::aimMode,
 						Extras::new);
 	}
 
@@ -99,9 +111,11 @@ public record KashiParticleOptions(Identifier effectId, float dirX, float dirY, 
 					com.mojang.serialization.Codec.FLOAT.optionalFieldOf("duration", 0f)
 							.forGetter(KashiParticleOptions::durationOffset),
 					com.mojang.serialization.Codec.STRING.optionalFieldOf("attach", "")
-							.forGetter(KashiParticleOptions::attachPoint))
-			.apply(instance, (effectId, dx, dy, dz, entity, scale, duration, attach) ->
-					new KashiParticleOptions(effectId, dx, dy, dz, entity, new Extras(scale, duration, attach))));
+							.forGetter(KashiParticleOptions::attachPoint),
+					com.mojang.serialization.Codec.STRING.optionalFieldOf("aim", "FULL")
+							.forGetter(KashiParticleOptions::aimMode))
+			.apply(instance, (effectId, dx, dy, dz, entity, scale, duration, attach, aim) ->
+					new KashiParticleOptions(effectId, dx, dy, dz, entity, new Extras(scale, duration, attach, aim))));
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, KashiParticleOptions> STREAM_CODEC =
 			StreamCodec.composite(

@@ -84,6 +84,17 @@ public final class KashiParticleAPI {
 	}
 
 	/**
+	 * As the overload below, following the entity's whole look ({@link #AIM_FULL}) - what an
+	 * attached spawn did before the aim mode was carried through to the emitter.
+	 */
+	public static void spawnKashiParticle(Level level, Identifier effectId,
+			double x, double y, double z, double dirX, double dirY, double dirZ, int entityId,
+			float scaleOffset, float durationOffset, String attachPoint) {
+		spawnKashiParticle(level, effectId, x, y, z, dirX, dirY, dirZ, entityId, scaleOffset,
+				durationOffset, attachPoint, AIM_FULL);
+	}
+
+	/**
 	 * The real implementation, with an attach point on top of everything the other overload
 	 * takes. Every other overload delegates here (through the one above).
 	 *
@@ -95,10 +106,10 @@ public final class KashiParticleAPI {
 	 */
 	public static void spawnKashiParticle(Level level, Identifier effectId,
 			double x, double y, double z, double dirX, double dirY, double dirZ, int entityId,
-			float scaleOffset, float durationOffset, String attachPoint) {
+			float scaleOffset, float durationOffset, String attachPoint, String aimMode) {
 		ParticleOptions options = new KashiParticleOptions(effectId,
 				(float) dirX, (float) dirY, (float) dirZ, entityId,
-				new KashiParticleOptions.Extras(scaleOffset, durationOffset, attachPoint));
+				new KashiParticleOptions.Extras(scaleOffset, durationOffset, attachPoint, aimMode));
 
 		if (level instanceof ServerLevel serverLevel) {
 			for (ServerPlayer player : serverLevel.players())
@@ -195,7 +206,7 @@ public final class KashiParticleAPI {
 		Vec3 aim = aimVector(entity, aimMode);
 
 		spawnKashiParticle(level, effectId, origin.x, origin.y, origin.z, aim.x, aim.y, aim.z,
-				entity.getId(), scaleOffset, durationOffset, attachPoint);
+				entity.getId(), scaleOffset, durationOffset, attachPoint, aimMode);
 	}
 
 	/**

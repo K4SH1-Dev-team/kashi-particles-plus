@@ -95,8 +95,17 @@ energy in a hand that turns with the arm.
     instance).
 - `right` / `up` / `forward` and `aim` work exactly like **Spawn KASHI Particle from entity**
   above, just measured from the chosen point instead of always the feet (`up: 0` lands right on
-  that point). Rotation follows the *full* look direction — pitch included — so an offset on a
-  head/eye anchor swings up and down as the entity looks up and down, not just side to side.
+  that point). `aim` keeps applying for as long as the effect follows the entity, not just at the
+  moment it spawns:
+  - **follows full look (up/down too)** — the offset turns with the full look direction, pitch
+    included, so an offset on a head/eye anchor swings up and down as the entity looks up and
+    down, not just side to side.
+  - **turns with entity, stays level** — the offset turns with the entity's yaw only. Looking up or
+    down never moves the effect, which is what a body/root anchor with an `up` offset (energy held
+    at the hip, an aura around the chest) needs; with *full look*, that offset would swing in an
+    arc around the feet whenever the entity pitched.
+  - **no aim - world orientation (AOE)** — the offset keeps its world axes and only the anchor
+    point moves with the entity.
 - Same `scale` / `duration` additive offsets as every spawn block above, both defaulting to `0`.
 
 Like every KASHI spawn, this is still fire-and-forget: an attached looping effect ends on its own
