@@ -110,7 +110,13 @@ Run in this order after changing anything under `core/` or `runtime/`:
    workspace can compile and run them for manual in-game testing.
 3. **`tools/check-mod-compile.ps1`** — type-checks each workspace's copy against that generator's
    real Minecraft + NeoForge API (via the workspace's own merged jar + resolved classpath),
-   without invoking Gradle.
+   without invoking Gradle. Those cached classpath files hold absolute paths into the Gradle cache
+   of the machine that built the workspace, so the script maps each entry onto this machine's own
+   cache (`~/.gradle` and `~/.mcreator/gradle`) first: same version when it is there, another
+   version of a support library (reported) when it is not. It never substitutes the NeoForge jar
+   itself - a workspace whose NeoForge is not cached locally is **skipped** with a message instead
+   of producing a wall of unrelated "package does not exist" errors, and the run ends with which
+   workspaces were checked and which were skipped.
 4. **`tools/make-runtime-templates.ps1`** — turns `runtime/` (plus each generator's overlay) into
    the `.java.ftl` templates under `src/<generator>/templates/kashiparticle/runtime/` and
    regenerates that generator's `kashiparticle.definition.yaml`, once per generator. The one thing

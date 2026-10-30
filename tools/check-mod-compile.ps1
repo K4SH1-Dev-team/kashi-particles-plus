@@ -38,6 +38,73 @@ $installs = @{
 #              plugin resolves the classpath without ever writing it anywhere) - resolved instead
 #              by actually asking Gradle, once, via kashi-print-classpath.init.gradle. See that
 #              file for why it needs --no-configuration-cache and can't just be a normal task.
+# The cached classpath files (build/moddev/clientLegacyClasspath.txt, kashiResolvedClasspath.txt) are
+# written by whichever machine last built the workspace, so every entry is an absolute path into THAT
+# machine's Gradle cache - a workspace built (or copied over) from another user profile lists jars
+# under a profile that does not exist here, and javac then reports hundreds of "package ... does not
+# exist" errors that have nothing to do with the code being checked. Each entry is mapped onto this
+# machine's own caches instead (MCreator's Gradle runs with ~/.mcreator/gradle, a plain Gradle with
+# ~/.gradle).
+$gradleCaches = @(
+    (Join-Path $env:USERPROFILE ".gradle\caches\modules-2\files-2.1"),
+    (Join-Path $env:USERPROFILE ".mcreator\gradle\caches\modules-2\files-2.1")
+) | Where-Object { Test-Path $_ }
+
+# Maps a list of cached classpath entries onto this machine. For each entry:
+#   - it exists as written                        -> kept
+#   - the same group/artifact/version is in a local cache -> remapped (exact)
+#   - only another version of that artifact is local      -> substituted, and reported: fine for the
+#     support libraries (gson, joml, netty, ...), but never done for net.neoforged:neoforge itself,
+#     since a different NeoForge than the workspace's would make the check mean something else
+#   - nothing found                               -> reported as missing
+function Resolve-ClasspathEntries {
+    param([string[]]$Entries)
+
+    $resolved = @()
+    $substituted = @()
+    $missing = @()
+    $marker = "files-2.1\"
+
+    foreach ($raw in $Entries) {
+        $entry = $raw.Trim().Replace("/", "\")
+        if (-not $entry) { continue }
+
+        if (Test-Path -LiteralPath $entry) { $resolved += $entry; continue }
+
+        $at = $entry.IndexOf($marker)
+        $parts = @()
+        if ($at -ge 0) { $parts = $entry.Substring($at + $marker.Length).Split("\") }
+        if ($parts.Count -ne 5) { $missing += $entry; continue }
+
+        $group = $parts[0]; $artifact = $parts[1]; $version = $parts[2]; $file = $parts[4]
+
+        $hit = $null
+        foreach ($root in $gradleCaches) {
+            $dir = Join-Path $root "$group\$artifact\$version"
+            if (Test-Path $dir) {
+                $hit = Get-ChildItem $dir -Filter $file -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($hit) { break }
+            }
+        }
+
+        if (-not $hit -and -not ($group -eq "net.neoforged" -and $artifact -eq "neoforge")) {
+            foreach ($root in $gradleCaches) {
+                $dir = Join-Path $root "$group\$artifact"
+                if (Test-Path $dir) {
+                    $hit = Get-ChildItem $dir -Filter "$artifact-*.jar" -Recurse -File -ErrorAction SilentlyContinue |
+                           Where-Object { $_.Name -notmatch '-(sources|javadoc)\.jar$' } |
+                           Sort-Object FullName | Select-Object -Last 1
+                    if ($hit) { $substituted += "$artifact $version -> $($hit.Directory.Parent.Name)"; break }
+                }
+            }
+        }
+
+        if ($hit) { $resolved += $hit.FullName } else { $missing += $entry }
+    }
+
+    [pscustomobject]@{ Resolved = $resolved; Substituted = $substituted; Missing = $missing }
+}
+
 $workspaces = @(
     [pscustomobject]@{ Name = "kashi_particle_test"; Label = "NeoForge 1.21.1 (MCreator 2026.1)"; Install = "2026.1"; ClasspathMode = "legacy" },
     [pscustomobject]@{ Name = "teste_vinte_oito";    Label = "NeoForge 1.21.8 (MCreator 2026.1)"; Install = "2026.1"; ClasspathMode = "legacy" },
@@ -47,6 +114,8 @@ $workspaces = @(
 )
 
 $overallCode = 0
+$checked = @()
+$skipped = @()
 
 foreach ($ws in $workspaces) {
     $workspace = Join-Path $localRoot "workspace\$($ws.Name)"
@@ -96,9 +165,9 @@ foreach ($ws in $workspaces) {
             }
         }
 
-        $deps = Get-Content $resolvedFile
-        $classpath = $deps -join ";"
-        $jarLabel = "$($deps.Count) jars (gradle-resolved)"
+        $deps = Resolve-ClasspathEntries (Get-Content $resolvedFile)
+        $classpath = $deps.Resolved -join ";"
+        $jarLabel = "$($deps.Resolved.Count) jars (gradle-resolved)"
     } else {
         # The merged jar is authoritative for Minecraft + NeoForge classes; everything else fills
         # in the library dependencies. Matched by pattern rather than a hardcoded version, since
@@ -125,9 +194,27 @@ foreach ($ws in $workspaces) {
             throw "[$($ws.Name)] $classpathFile not found - open/build the workspace in MCreator once first"
         }
 
-        $deps = Get-Content $classpathFile
-        $classpath = (@($merged.FullName) + $deps) -join ";"
-        $jarLabel = "$($deps.Count + 1) jars ($($merged.Name))"
+        $deps = Resolve-ClasspathEntries (Get-Content $classpathFile)
+        $classpath = (@($merged.FullName) + $deps.Resolved) -join ";"
+        $jarLabel = "$($deps.Resolved.Count + 1) jars ($($merged.Name))"
+    }
+
+    # Say what was done to the cached classpath instead of silently papering over it.
+    if ($deps.Substituted.Count -gt 0) {
+        Write-Host "[$($ws.Name)] note: $($deps.Substituted.Count) jar(s) not cached here at the workspace's exact version were replaced by another local version, e.g. $(($deps.Substituted | Select-Object -First 3) -join '; ')"
+    }
+    if ($deps.Missing.Count -gt 0) {
+        Write-Host "[$($ws.Name)] note: $($deps.Missing.Count) listed jar(s) are not on this machine at all (usually transitive libraries the runtime never imports); javac will say so if one was needed."
+    }
+
+    # The NeoForge API jar is what the runtime is being checked against, and no other version stands
+    # in for it - without it the result is meaningless, so skip with the reason rather than report
+    # hundreds of unrelated errors.
+    $apiMissing = @($deps.Missing | Where-Object { $_ -match '\\net\.neoforged\\neoforge\\' })
+    if ($apiMissing.Count -gt 0) {
+        Write-Host "[$($ws.Name)] SKIPPED - the NeoForge jar this workspace was built against is not in this machine's Gradle cache ($(Split-Path -Leaf $apiMissing[0])). Open and build the workspace in MCreator on this machine once; if its cached classpath file under build\moddev still lists the old paths afterwards, delete it so it gets rebuilt.`n"
+        $skipped += $ws.Name
+        continue
     }
 
     if (Test-Path $out) { Remove-Item $out -Recurse -Force }
@@ -174,11 +261,21 @@ foreach ($ws in $workspaces) {
     # error - so a successful compile would abort this script before it could report success.
     # Relax the preference across the call only, and judge the result by the exit code, which is
     # what javac actually uses to signal failure.
+    #
+    # Run from the temp folder: when javac exits on errors it can leave a javac.<timestamp>.args file
+    # in its working directory, which would otherwise land in the repo.
     $previous = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
-    & $javac "@$argfile"
-    $code = $LASTEXITCODE
+    Push-Location $env:TEMP
+    try {
+        & $javac "@$argfile"
+        $code = $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
     $ErrorActionPreference = $previous
+
+    $checked += $ws.Name
 
     if ($code -eq 0) {
         Write-Host "[$($ws.Name)] OK - mod-side runtime compiles against the $($ws.Label) API.`n"
@@ -187,5 +284,9 @@ foreach ($ws in $workspaces) {
         $overallCode = $code
     }
 }
+
+# A run that checked nothing must not look like a pass.
+Write-Host "Checked: $(if ($checked.Count) { $checked -join ', ' } else { 'none' }). Skipped: $(if ($skipped.Count) { $skipped -join ', ' } else { 'none' })."
+if ($checked.Count -eq 0 -and $overallCode -eq 0) { $overallCode = 1 }
 
 exit $overallCode
