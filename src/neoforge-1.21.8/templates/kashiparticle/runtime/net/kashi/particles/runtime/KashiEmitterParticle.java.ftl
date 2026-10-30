@@ -45,13 +45,19 @@ public class KashiEmitterParticle extends Particle {
 
 	/**
 	 * Non-empty only for a spawn from the "Attach K4SH1 Particle to Entity" procedure - forces
-	 * position AND rotation tracking (yaw and pitch both - see {@link #fullLookFrame}) regardless
+	 * position AND rotation tracking (how much of the look it follows is {@link #aimMode}) regardless
 	 * of what the source {@code .particle.json} authored in {@link #localSpace}, and picks which
 	 * point on the entity {@link #resolveAnchorPosition()} tracks. Empty for every other spawn
 	 * path, which is what keeps this feature additive: nothing here changes for an effect that
 	 * never opted into being attached.
 	 */
 	private final String attachPoint;
+
+	/**
+	 * {@code FULL}, {@code HORIZONTAL} or {@code NONE}: which part of the anchor's look an Attach spawn
+	 * keeps following (see {@link #followFrame}). Only consulted when {@link #attachPoint} is set.
+	 */
+	private final String aimMode;
 
 	/** The entity this effect follows, or null when it is world-space or nothing was named. */
 	private final net.minecraft.world.entity.Entity anchor;
@@ -120,14 +126,14 @@ public class KashiEmitterParticle extends Particle {
 
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor) {
-		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, 0, 0, "", null, KashiParticleOptions.NO_ENTITY);
+		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, 0, 0, "", KashiParticleAPI.AIM_FULL, null, KashiParticleOptions.NO_ENTITY);
 	}
 
 	/** @param eventDepth how many chained events deep this emitter already is; 0 when fired directly */
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor,
 			int eventDepth) {
-		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, eventDepth, 0, 0, "",
+		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, eventDepth, 0, 0, "", KashiParticleAPI.AIM_FULL,
 				null, KashiParticleOptions.NO_ENTITY);
 	}
 
@@ -147,9 +153,9 @@ public class KashiEmitterParticle extends Particle {
 	 */
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor,
-			float scaleOffset, float durationOffset, String attachPoint,
+			float scaleOffset, float durationOffset, String attachPoint, String aimMode,
 			ResourceLocation originEffectId, int originEntityId) {
-		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, scaleOffset, durationOffset, attachPoint,
+		this(level, x, y, z, effect, dirX, dirY, dirZ, anchor, 0, scaleOffset, durationOffset, attachPoint, aimMode,
 				originEffectId, originEntityId);
 	}
 
@@ -163,7 +169,7 @@ public class KashiEmitterParticle extends Particle {
 	 */
 	KashiEmitterParticle(ClientLevel level, double x, double y, double z, KashiCompiledEffect effect,
 			double dirX, double dirY, double dirZ, net.minecraft.world.entity.Entity anchor,
-			int eventDepth, float scaleOffset, float durationOffset, String attachPoint,
+			int eventDepth, float scaleOffset, float durationOffset, String attachPoint, String aimMode,
 			ResourceLocation originEffectId, int originEntityId) {
 		super(level, x, y, z);
 
@@ -175,6 +181,7 @@ public class KashiEmitterParticle extends Particle {
 		this.originEntityId = originEntityId;
 
 		this.attachPoint = attachPoint == null ? "" : attachPoint;
+		this.aimMode = aimMode == null ? KashiParticleAPI.AIM_FULL : aimMode;
 
 		this.localSpace = effect.definition().localSpace();
 		// An effect that never asked to be local, and was not fired through Attach either, ignores
@@ -372,7 +379,7 @@ public class KashiEmitterParticle extends Particle {
 	/**
 	 * The anchor's heading as a rotation, yaw AND pitch - reuses {@link #aimQuaternion} against the
 	 * anchor's own look direction rather than re-deriving the same yaw/pitch decomposition. Used
-	 * only for Attach ({@link #hasAttachPoint()}): a HEAD or EYE point turning to look up or down is
+	 * only for an Attach with the FULL aim ({@link #aimMode}): a HEAD or EYE point turning to look up or down is
 	 * exactly what an attached effect should follow, unlike a plain {@code emitter_local_space}
 	 * effect, which keeps the yaw-only behaviour {@link #yawFrame} always had (see its own doc
 	 * comment for why pitch is deliberately excluded there).
@@ -397,8 +404,13 @@ public class KashiEmitterParticle extends Particle {
 	private Quaternionf followFrame(net.minecraft.world.entity.Entity entity) {
 		if (!hasAttachPoint())
 			return yawFrame(entity);
+		// The aim the effect was fired with decides what it keeps following, the same way it decided how it
+		// was first turned: FULL tips with the look (pitch included), HORIZONTAL turns with the entity but
+		// stays level, NONE keeps world axes and only follows the position.
+		if (this.aimMode.equals(KashiParticleAPI.AIM_NONE))
+			return new Quaternionf();
 		float limbSwing = KashiParticleAPI.resolveLimbSwingRadians(entity, this.attachPoint);
-		Quaternionf frame = fullLookFrame(entity);
+		Quaternionf frame = this.aimMode.equals(KashiParticleAPI.AIM_HORIZONTAL) ? yawFrame(entity) : fullLookFrame(entity);
 		return limbSwing == 0 ? frame : frame.rotateX(limbSwing);
 	}
 
